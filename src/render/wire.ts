@@ -7,6 +7,7 @@
  */
 import {
   AdditiveBlending,
+  NormalBlending,
   BufferAttribute,
   BufferGeometry,
   DoubleSide,
@@ -48,6 +49,8 @@ export function fanTriangulate(faces: readonly number[][]): Uint32Array {
 /** Element counts of the tesseract wire (24 squares → 48 triangles, 32 edges), the reference density. */
 const REF_TRIANGLES = 48;
 const REF_EDGES = 96;
+/** Above this many edges a wire is drawn with normal instead of additive blending. */
+export const DENSE_EDGES = 2000;
 
 /** 1 at or below the reference count, then √(ref / count), never below `floor`. */
 export function densityFactor(count: number, ref: number, floor: number): number {
@@ -193,6 +196,16 @@ export class WireRenderable {
     );
     this.position.needsUpdate = true;
     this.color.needsUpdate = true;
+
+    // Additive blending glows nicely for a polytope's few dozen edges but sums
+    // to white on a dense wire (an extruded mesh has thousands of edges that
+    // overlap many deep). Dense wires use normal blending, which converges to
+    // the edge colour instead of exceeding it.
+    if (this.edgeCount > DENSE_EDGES) {
+      this.edges.material.blending = NormalBlending;
+      this.faces.material.blending = NormalBlending;
+      this.points.material.blending = NormalBlending;
+    }
   }
 
   /**
@@ -202,8 +215,8 @@ export class WireRenderable {
    * by √(reference / count), floored, so the total light stays comparable.
    */
   setOpacity(o: WireOpacity): void {
-    const f = densityFactor(this.triangleCount, REF_TRIANGLES, 0.04);
-    const e = densityFactor(this.edgeCount, REF_EDGES, 0.15);
+    const f = densityFactor(this.triangleCount, REF_TRIANGLES, 0.03);
+    const e = densityFactor(this.edgeCount, REF_EDGES, 0.08);
     this.edges.material.opacity = o.edges * e;
     this.faces.material.opacity = o.faces * f;
     this.points.material.opacity = o.vertices * e;
