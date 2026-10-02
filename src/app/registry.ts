@@ -1,6 +1,13 @@
 import type { Shape4 } from '../math/types';
 
-export type ShapeGroup = 'Regular polytopes' | 'Curved solids' | 'Lifted 3D objects' | 'Figures';
+export type ShapeGroup =
+  | 'Regular polytopes'
+  | 'Curved solids'
+  | 'Lifted 3D objects'
+  | 'Spun 3D objects'
+  | 'Smooth forms (SDF)'
+  | 'Figures'
+  | 'Imported';
 
 export interface ShapeEntry {
   /** Stable id, also the explainer topic id. */
@@ -48,4 +55,21 @@ export const SHAPE_IDS = {
   knotPrism: 'knot-prism',
   human: 'human',
   mug: 'mug',
+  spunBall: 'spun-ball',
+  spunHalfBall: 'spun-half-ball',
+  spunCube: 'spun-cube',
+  spunHuman: 'spun-human',
+  sdfSpheritorus: 'sdf-spheritorus',
+  sdfTorisphere: 'sdf-torisphere',
+  sdfTiger: 'sdf-tiger',
+  sdfDitorus: 'sdf-ditorus',
+  sdfCreature: 'sdf-creature',
 } as const;
+
+/** Prefix of ids given to models the user imports (MATH.md §12). */
+export const IMPORT_ID_PREFIX = 'import:';
+
+/** Remove a shape (used when an imported model is replaced). */
+export function unregisterShape(id: string): boolean {
+  return entries.delete(id);
+}

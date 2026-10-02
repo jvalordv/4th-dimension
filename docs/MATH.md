@@ -262,6 +262,18 @@ sum over boundary tets of cone volumes:
 vol_4 = Σ_tets  | det [ a - o ; b - o ; c - o ; d - o ] | / 24 .
 ```
 
+The signed sum without absolute values,
+
+```
+vol_4 = Σ_tets  det [ a - o ; b - o ; c - o ; d - o ] / 24 ,
+```
+
+is the 4D divergence theorem and holds for *every* closed, outward-oriented
+tet complex, star-shaped or not, with any reference point `o` (a solid with a
+hole, such as a spun ball of section 9.2, is not star-shaped about the
+origin; this form still gives its 4-volume). The two agree exactly when the
+cone form is valid.
+
 For any unit `n`, the slice volume `A(c)` as a function of offset satisfies
 `∫ A(c) dc = vol_4` (Cavalieri). This is a strong, direction-independent
 consistency check between the slicer and the tet complex; tests integrate
@@ -388,20 +400,143 @@ through an extruded object shows a sheared slab of the original.
 
 ### 9.2 Spin (rotation about a plane)
 
-For `S` in the half-space `z ≥ 0`, `spin(S) = { (x, y, z cos φ, z sin φ) }`:
-`S` is swept about the plane `z = 0`, the 4D analogue of a solid of
-revolution. One dimension down, a half-disc spun about its diameter is a
-ball; here a half-ball spun about its equatorial plane is a 4-ball, and a
-ball lying in `z > 0` spun this way is the 4D analogue of a solid torus (just
-as a disc in `y > 0` spun about the `x` axis is a torus, not a ball). Not in
-the first build; the interface must leave room for it.
+For a solid `S ⊂ R^3` lying in the half-space `z ≥ 0`,
+
+```
+spin(S) = { (x, y, z cos φ, z sin φ) : (x, y, z) ∈ S, φ ∈ [0, 2π) }.
+```
+
+`S` is swept about the plane `z = 0`, which becomes the `zw`-plane's origin:
+the 4D analogue of a solid of revolution. One dimension down, a half-disc
+spun about its diameter is a ball. Here a half-ball spun about its equatorial
+plane is a 4-ball, a ball lying in `z > 0` spun this way is a *spheritorus*
+(boundary `S^2 × S^1`, the 4D analogue of a solid torus), and a cube in
+`z > 0` becomes a solid ring with square cross-section.
+
+A solid that crosses `z = 0` is first clipped to `z ≥ 0` (section 9.4), so
+that the spun solid is well defined; the viewer says so.
+
+Boundary. Let `M` be `S`'s boundary mesh and `F ⊂ M` the part lying in the
+plane `z = 0`. Points of `F` are fixed by the spin and land in the interior
+of `spin(S)`, so the boundary of `spin(S)` is the spin of `M \ F`: every
+triangle of `M` with at least one vertex at `z > 0`.
+
+Discretisation with `N` steps `φ_k = 2πk/N`: vertex `(x, y, z)` maps to
+`v_k = (x, y, z cos φ_k, z sin φ_k)`; a vertex with `z = 0` maps to the
+single point `(x, y, 0, 0)` for every `k`. Each triangle `(a, b, c)` of
+`M \ F` and each step `k` gives the prism `(a_k, b_k, c_k, a_{k+1}, b_{k+1},
+c_{k+1})`, split into three tets with a consistent diagonal rule. The lateral
+quads of the prism are planar trapezoids (`a_k a_{k+1}` and `b_k b_{k+1}` are
+both parallel to `(0, 0, cos φ_k − cos φ_{k+1}, sin φ_k − sin φ_{k+1})`), so
+the split is exact. A prism with a vertex at `z = 0` collapses into a pyramid
+and yields tets with repeated vertices; those are dropped and the remaining
+tets still close up.
+
+Orientation: the outward 4D normal of a lateral tet at step `k` is the spun
+triangle normal `(n_x, n_y, n_z cos φ, n_z sin φ)` for a `φ` inside the step;
+tets are oriented against it (swap two vertices when the sign is wrong).
+
+Known answers (Pappus): the 4-volume of the swept solid equals the 3-volume
+of `S` times the length of the circle traced by its centroid,
+
+```
+vol_4(spin(S)) = 2π · z̄ · vol_3(S) = 2π ∫_S z dV ,
+```
+
+and the discrete construction gives exactly `(N/(2π)) sin(2π/N)` times that,
+because each point sweeps an `N`-gon of circumradius `z` (area
+`(N/2) z^2 sin(2π/N)`) instead of a circle. Tests assert the discrete value
+to round-off and the continuum value within the polygon factor. For a ball
+of radius `r` centred at height `z_0 > r`: `vol_4 = 2π z_0 · (4/3)π r^3`;
+for the half-ball `{|p| ≤ R, z ≥ 0}`: `2π · (3R/8) · (2/3)π R^3 = π^2 R^4/2`,
+the 4-ball, whose slices and hypervolume must then match section 8.5.
+
+Slices of a spun solid by `w = c`: a point `(x, y, z)` is in the slice iff
+`(x, y, √(z^2 + c^2)) ∈ S`. At `c = 0` the slice is `S` together with its
+mirror image in `z = 0`: a spun figure passes through our space as a pair of
+mirror twins that approach each other and vanish once `|c|` exceeds the
+figure's greatest height. For the spheritorus (ball of radius `r` at height
+`z_0`) the slice at `|c| < z_0 − r` is two balls of radius `r` at heights
+`±√(z_0^2 − c^2)` up to the distortion of `√(z^2 + c^2)`, and the slice
+4-volume integral along `e_w` recovers the Pappus value.
 
 ### 9.3 Signed distance fields
 
-A solid may also be given as `f : R^4 → R` with `f ≤ 0` inside. Slicing is
-marching cubes on `g(a, b, d) = f(c n + a u_1 + b u_2 + d u_3)`. Not in the
-first build; the `Shape4` interface admits an implementation that provides a
-slice without a tet complex.
+A solid may also be given implicitly by `f : R^4 → R`, `f ≤ 0` inside, `f`
+Lipschitz with constant 1 (a *signed distance field*, SDF) or at least a
+bound on the distance to the surface. Primitives, all centred at the origin
+unless translated (`|·|` is the Euclidean norm):
+
+| Primitive | `f(p)` | 4-volume |
+|---|---|---|
+| 4-ball radius `r` | `|p| − r` | `π^2 r^4 / 2` |
+| 4-box half-sizes `h` | `q_i = |p_i| − h_i`; `f = |max(q, 0)| + min(max_i q_i, 0)` | `16 h_1 h_2 h_3 h_4` |
+| capsule, segment `ab`, radius `r` | `|p − a − t(b − a)| − r`, `t = clamp((p−a)·(b−a)/|b−a|^2, 0, 1)` | ball + cylinder |
+| duocylinder `r_1, r_2` | `max(√(x²+y²) − r_1, √(z²+w²) − r_2)` (a bound, exact on the two tori) | `π^2 r_1^2 r_2^2` |
+| spheritorus `R, r` | `√((√(x²+y²+z²) − R)^2 + w^2) − r` | `2πR · (4/3)π r^3` |
+| torisphere `R, r` | `√((√(x²+y²) − R)^2 + z^2 + w^2) − r` | `2πR · (4/3)π r^3` |
+| tiger `R_1, R_2, r` | `√((√(x²+y²) − R_1)^2 + (√(z²+w²) − R_2)^2) − r` | `4π^3 R_1 R_2 r^2` |
+| ditorus `R_1, R_2, r` | `√((√((√(x²+y²) − R_1)^2 + z^2) − R_2)^2 + w^2) − r` | `2πR_1 · 2πR_2 · π r^2` |
+
+The volumes are Pappus: the set of points within `r` of a circle of radius
+`R` is a 3-ball swept around the circle (spheritorus and torisphere are the
+same solid in different coordinates, both `S^2 × S^1`); the tiger is the
+set within `r` of the flat Clifford torus (area `4π^2 R_1 R_2`, normal disc of
+area `π r^2`, exact because the torus is flat and `r < min(R_1, R_2)`); the
+ditorus is a circle swept twice. These hold when `r` is small enough that
+the normal discs do not overlap (`r < R` for the torus-like ones).
+
+Operations: union `min(f, g)`, intersection `max(f, g)`, difference
+`max(f, −g)`, smooth union `smin_k(f, g) = min(f, g) − h^2 / (4k)` with
+`h = max(k − |f − g|, 0)` (the polynomial smooth minimum; a bound, not a
+distance), translation `f(p − t)`, rotation `f(M^T p)` for a rotation `M`
+(so the shape rotates by `M`), uniform scale `s · f(p / s)`. Unions and
+smooth unions of primitives give the blended "creatures" the viewer offers.
+
+Slicing (direct). On the hyperplane `H(n, c)` with chart basis `u_k`, define
+`g(q) = f(c n + q_1 u_1 + q_2 u_2 + q_3 u_3)` on a grid over
+`[−R, R]^3`, where `R` bounds the solid. Extract the zero level set of `g` by
+marching tetrahedra on the grid: each cube is split into six tets (the
+Kuhn/Freudenthal split along the main diagonal), each tet is classified by
+the signs of `g` at its corners exactly as in section 6 (zero counts as
+positive), crossing points are placed by linear interpolation, and each
+output triangle is oriented so that its normal points toward the positive
+(outside) corners. The result converges to the true slice as the grid is
+refined; tests compare slice volumes against the table (the 4-ball slice
+`(4/3)π(r^2 − c^2)^{3/2}`, the Cavalieri integral of each primitive against
+its 4-volume) with tolerances tied to the grid spacing.
+
+Extraction to a tet complex (marching pentatopes). The zero set of `f` in
+`R^4` is a closed 3-manifold. On a 4D grid over `[−R, R]^4`, split each
+hypercube into `4! = 24` pentatopes (4-simplices) by the Freudenthal rule
+(the simplices are the chains `p ≤ p + e_{σ(1)} ≤ ... ≤ p + e_{σ(1)} + ... +
+e_{σ(4)}` over permutations `σ`), classify the five corners by sign, and
+emit: nothing for 0 or 5 positive corners; one tet (the four crossing points)
+for 1 or 4; a triangular prism (six crossing points, split into three tets)
+for 2 or 3. For positives `{a, b}` and negatives `{c, d, e}` the two
+triangles of the prism are `(ac, ad, ae)` and `(bc, bd, be)`, joined along
+corresponding vertices. Orient each tet outward by the rule of section 6
+lifted one dimension: `cross4` of its edges must point toward the positive
+corners. The result is a valid tet complex (section 5.2) and feeds the same
+slicer, hypervolume and wire machinery as every other shape; its signed
+hypervolume converges to the table values with refinement, and slicing it
+must agree with the direct slice above to within both discretisations.
+
+Projection view for an SDF shape draws the vertices and edges of its
+extracted complex, coloured by `w` like any wire.
+
+### 9.4 Clipping a 3D solid by a plane
+
+`clip(S, m, k) = S ∩ { q : m · q ≥ k }`. Triangles of `M` are classified by
+the signs of `m · v − k` at their vertices (zero positive, as in section 6);
+a triangle with mixed signs is cut into the part on the positive side (one
+triangle or a quad split in two), with crossing points on edges identified by
+edge so that neighbours share them exactly. The cut is closed by the planar
+section of `S` by the plane (section 9.1's section machinery), oriented with
+normal `−m`. The result is a closed, consistently oriented mesh whose volume
+is `vol_3(S)` minus the removed part; for the ball `|p| ≤ R` clipped by
+`z ≥ 0` the volume is `(2/3)π R^3` and for the box `[−1, 1]^3` clipped by
+`z ≥ 0` it is 4.
 
 ## 10. Colour encoding
 
@@ -428,3 +563,45 @@ The two scales differ: for the tesseract `R = 2` while its own `w` extent is
 projection view but at the ends in the slice view, and in the overlay the
 same material is coloured differently by the two layers. The legend
 therefore shows one row per view with its own end values.
+
+## 11. Flatland mode: everything one dimension down
+
+The same constructions with `R^3` in place of `R^4` and `R^2` in place of
+`R^3`, so that the analogy the explainers lean on can be *watched* rather
+than described. A 3D solid is the "higher-dimensional object"; its boundary
+mesh plays the role of the tet complex; Flatland is the plane `z = 0`.
+
+- Rotation planes: `XY` (the only rotation Flatlanders have), `XZ` and `YZ`
+  (the two that turn the object partly out of their world; the analogues of
+  `XW, YW, ZW`). Matrices as in section 2.1 restricted to `R^3`; `XZ(θ)`
+  turns `e_x` toward `e_z`.
+- Projection to the plane: orthographic `(x, y, z) ↦ (x, y)`; perspective
+  from an eye at `(0, 0, d)`: `(x, y) · d / (d − z)`. The cube `[−1, 1]^3`
+  from `d = 3` is the square-inside-a-square, scales `3/2` and `3/4`, the
+  analogue of section 3.2.
+- Slicing: the plane `{ q : m · q = k }`, `|m| = 1`, with a 2D chart basis
+  `(u_1, u_2)` of `m^⊥`, `det(u_1, u_2, m) = +1`, equal to `(e_x, e_y)` when
+  `m = e_z`. The slice of a closed mesh is the planar section of section 9.1
+  (segments chained by edge into loops, holes by nesting parity), drawn as
+  filled polygons, oriented counter-clockwise for outer loops.
+- Colour encodes `z`, exactly as `w` in section 10.
+- Known answers: the cube `[−1, 1]^3` sliced by `z = c`, `|c| < 1`, is a
+  square of area 4; by the plane `(1,1,1)/√3` through the origin, a regular
+  hexagon with vertices at the six edge midpoints, side `√2`, area `3√3`;
+  moving that plane from one corner to the opposite one gives point,
+  triangle, hexagon, triangle, point, the analogue of section 8.4. The ball
+  of radius `R` gives discs of area `π(R^2 − c^2)`. The integral of slice
+  area over the offset is the 3-volume, Cavalieri one dimension down.
+
+## 12. Imported 3D models
+
+A model arrives as triangles (OBJ or glTF/GLB). It is welded by position,
+re-centred at its bounding-box centre and scaled so its bounding radius is 1,
+then validated: every edge must belong to exactly two triangles with
+opposite directions (section 9.1's requirement). A closed model may be lifted
+by extrusion (9.1) or spin (9.2, after clipping). An open model can still be
+projected (the lateral structure of 9.1 needs no caps) and sliced without
+caps, and the viewer must say that its slices are then open surfaces. If the
+signed volume of a closed model is negative its triangles are reversed, so
+that outward orientation holds.
+

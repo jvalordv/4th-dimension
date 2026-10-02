@@ -3,8 +3,16 @@
  * shape ids from src/app/registry (SHAPE_IDS), plus
  *   'view:projection' | 'view:slice' | 'view:overlay'
  *   'rotation:XY' | 'rotation:XZ' | 'rotation:XW' | 'rotation:YZ' | 'rotation:YW' | 'rotation:ZW'
- *   'lift:extrude' | 'color' | 'intro'
+ *   'lift:extrude' | 'lift:spin' | 'sdf' | 'import' | 'xr' | 'color' | 'intro'
+ * Flatland mode (MATH.md §11):
+ *   'flat:intro' | 'flat:projection' | 'flat:slice' | 'flat:rotation'
+ *   'flat:cube' | 'flat:tetrahedron' | 'flat:octahedron' | 'flat:ball' | 'flat:torus' | 'flat:cylinder' | 'flat:human'
  */
+
+/** Flatland shape ids, fixed so the Flatland module and the explainers agree. */
+export const FLAT_SHAPE_IDS = ['cube', 'tetrahedron', 'octahedron', 'ball', 'torus', 'cylinder', 'human'] as const;
+export type FlatShapeId = (typeof FLAT_SHAPE_IDS)[number];
+export const FLAT_TOPICS = ['intro', 'projection', 'slice', 'rotation', ...FLAT_SHAPE_IDS] as const;
 export type Tier = 'eli5' | 'intermediate' | 'math';
 
 export const TIERS: readonly Tier[] = ['eli5', 'intermediate', 'math'];
