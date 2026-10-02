@@ -41,7 +41,15 @@ There is no canonical 4D version of a 3D object. The lifted shapes use
 a tesseract. The viewer says so, and the math document explains the
 alternatives.
 
-## Run it
+## Try it
+
+The viewer is published with GitHub Pages at
+<https://jvalordv.github.io/4th-dimension/> on every push to the default
+branch (`.github/workflows/pages.yml`). Pages must be enabled once in the
+repository settings with source "GitHub Actions", and a private repository
+needs a paid GitHub plan for Pages, otherwise make the repository public.
+
+## Run it locally
 
 ```
 npm install
