@@ -10,8 +10,9 @@
  * - overlay: both, the slice scaled by d / (d − c) under perspective and 1
  *   under orthographic (§3.2) with the wire drawn as a faint ghost.
  *
- * The slice is rebuilt only when M, c or the shape changed; wire geometry
- * is cached per shape; replaced geometries are disposed.
+ * The slice is rebuilt only when M, c or the shape changed, and is cleared
+ * the moment the shape changes; wire geometry is cached per shape; replaced
+ * geometries are disposed.
  */
 import { Clock, Color, PerspectiveCamera, Scene, WebGLRenderer, type GridHelper } from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
@@ -20,6 +21,7 @@ import { compositeRotation, ROTATION_PLANES } from '../math/rotation';
 import { hyperplaneFromRotation } from '../math/hyperplane';
 import { symmetricWScale, wColorScale } from '../app/colors';
 import type { ViewerState } from '../app/state';
+import type { Projection } from '../math/projection';
 import { BACKGROUND, createGrid, createLights } from './scene';
 import { SliceRenderable, sliceScale } from './slice-mesh';
 import { WIRE_OPACITY_FULL, WIRE_OPACITY_GHOST, WireRenderable } from './wire';
@@ -104,13 +106,19 @@ export class Viewer {
   }
 
   /**
-   * Place the camera for a shape of radius R. Under the default eye
-   * distance d ≥ 2.5 R the projected extent is at most 5/3 R (§3.2), so a
-   * camera at 3.6 R with a 42° field of view frames the whole object.
+   * Place the camera for a shape of radius R so that its projected extent
+   * fills about 62 % of the view's half-height. Under perspective from eye
+   * distance d a point at |p| = R with fourth coordinate w lands at distance
+   * √(R² − w²) · d/(d − w) (§3.2); the bound is the maximum over w ∈ [−R, R].
+   * Orthographic extent is R; stereographic images are unbounded near the
+   * pole, so 2.5 R is used as a working frame.
    */
-  frameShape(radius: number): void {
+  frameShape(radius: number, projection?: Projection): void {
     const r = Math.max(radius, 1e-3);
-    this.camera.position.set(0.95, 0.6, 1.25).normalize().multiplyScalar(3.6 * r);
+    const extent = projectedExtent(r, projection);
+    const fill = 0.62;
+    const dist = extent / (fill * Math.tan((this.camera.fov * Math.PI) / 360));
+    this.camera.position.set(0.95, 0.6, 1.25).normalize().multiplyScalar(dist);
     this.camera.near = 0.01 * r;
     this.camera.far = 200 * r;
     this.camera.updateProjectionMatrix();
@@ -123,7 +131,7 @@ export class Viewer {
   }
 
   /** Select the shape to draw: fetch or build its cached wire and reframe the camera. */
-  setShape(shape: Shape4): void {
+  setShape(shape: Shape4, projection?: Projection): void {
     if (shape === this.currentShape) return;
     if (this.wire) this.scene.remove(this.wire.group);
     this.currentShape = shape;
@@ -145,12 +153,21 @@ export class Viewer {
     }
     this.sliceKey = null;
     this.wireKey = null;
-    this.frameShape(shape.radius());
+    // Drop the previous shape's slice now rather than at its next rebuild:
+    // the pacing gate in render() spaces rebuilds by the last measured build
+    // cost, so with a slow previous shape its mesh could otherwise stay on
+    // screen, scaled by the new shape's offset, for a few frames. Resetting
+    // the cost makes gap = 1 until the new shape's first rebuild is timed.
+    this.slice.clear();
+    this.stats.sliceTriangles = 0;
+    this.stats.sliceBuildMs = 0;
+    this.framesSinceSlice = 0;
+    this.frameShape(shape.radius(), projection);
   }
 
   /** Draw one frame of `state` for `shape`. */
   render(state: Readonly<ViewerState>, shape: Shape4): void {
-    this.setShape(shape);
+    this.setShape(shape, state.projection);
     const showWire = state.viewMode !== 'slice';
     const showSlice = state.viewMode !== 'projection';
     const angleKey = ROTATION_PLANES.map((p) => state.angles[p]);
@@ -228,6 +245,20 @@ export class Viewer {
 
 const kindCode = (kind: ViewerState['projection']['kind']): number =>
   kind === 'perspective' ? 0 : kind === 'orthographic' ? 1 : 2;
+
+/** Bound on the 3D extent of the projected image of a ball of radius r. §3 */
+export function projectedExtent(r: number, projection?: Projection): number {
+  if (!projection || projection.kind === 'orthographic') return r;
+  if (projection.kind === 'stereographic') return 2.5 * r;
+  const d = projection.distance;
+  let best = r;
+  for (let i = 0; i <= 64; i++) {
+    const w = -r + (2 * r * i) / 64;
+    const denom = Math.max(d - w, 1e-3);
+    best = Math.max(best, (Math.sqrt(Math.max(r * r - w * w, 0)) * d) / denom);
+  }
+  return best;
+}
 
 function sameKey(a: readonly number[], b: readonly number[] | null): boolean {
   if (!b || a.length !== b.length) return false;

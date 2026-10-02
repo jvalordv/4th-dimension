@@ -19,7 +19,13 @@ export function chartBasis(normal: Vec4): [Vec4, Vec4, Vec4] {
     for (const u of basis) v = rejectFromUnit4(v, u);
     const l = length4(v);
     if (l < 1e-6) continue;
-    basis.push(scale4(v, 1 / l));
+    // Second Gram-Schmidt pass ("twice is enough"): the first rejection leaves
+    // an absolute residue ~1e-16 along n and the earlier u's, which normalising
+    // by l would amplify to ~1e-16/l (up to 1e-10 for a seed nearly parallel
+    // to n). Rejecting once more brings the residue back to ~1e-16.
+    v = rejectFromUnit4(v, n);
+    for (const u of basis) v = rejectFromUnit4(v, u);
+    basis.push(scale4(v, 1 / length4(v)));
   }
   if (basis.length !== 3) throw new Error('chartBasis: failed to build basis');
   // det of the matrix with columns (u1, u2, u3, n) equals det with rows

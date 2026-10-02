@@ -153,9 +153,9 @@ export class StateStore {
     const shape = this.shapes.get(id);
     this.state.shapeId = id;
     this.perspectiveDist = entry.projectionDistance ?? defaultProjectionDistance(shape.radius());
-    if (this.state.projection.kind === 'perspective') {
-      this.state.projection = { kind: 'perspective', distance: this.perspectiveDist };
-    }
+    const current = this.state.projection.kind;
+    const kind: ProjectionKind = entry.defaultProjection ?? (current === 'stereographic' ? 'perspective' : current);
+    this.state.projection = kind === 'perspective' ? { kind, distance: this.perspectiveDist } : { kind };
     this.state.sliceOffset = clampSliceOffset(this.state.sliceOffset, shape.radius());
     this.notify('shape');
   }

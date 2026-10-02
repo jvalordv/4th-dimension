@@ -116,11 +116,12 @@ const POLYTOPE_ENTRIES: readonly ShapeEntry[] = POLYTOPE_NAMES.map((name): Shape
 // ---- Curved solids (MATH.md §8.5, §8.6, §3.3) ------------------------------
 
 /**
- * Midpoint-subdivision level of the 4-ball (§8.5): 16 · 8³ = 8192 tets, slice
- * ≈ 1.6 ms. The chordal mesh is inscribed in S³, so its hypervolume is 5.3 %
- * below π²/2 (level 4 would be 1.4 % at 6× the slicing cost).
+ * Midpoint-subdivision level of the 4-ball (§8.5): 16 · 8⁴ = 65 536 tets,
+ * built in ≈ 90 ms, sliced in ≈ 9 ms. The chordal mesh is inscribed in S³,
+ * so its hypervolume is 1.4 % below π²/2 (level 3 would be 5.3 % at a sixth
+ * of the slicing cost).
  */
-const HYPERSPHERE_LEVEL = 3;
+const HYPERSPHERE_LEVEL = 4;
 const HYPERSPHERE_TETS = 16 * 8 ** HYPERSPHERE_LEVEL;
 
 /**
@@ -146,7 +147,7 @@ const CURVED_ENTRIES: readonly ShapeEntry[] = [
     label: 'Hypersphere',
     group: 'Curved solids',
     // §8.5: vol_4 = π²R⁴/2 and the slice at offset c is a ball of radius √(R² − c²).
-    description: `The 4-ball of radius 1, hypervolume π²/2 ≈ ${approx(Math.PI ** 2 / 2)}, whose slice at offset c is a ball of radius √(1 − c²), drawn as the 16-cell subdivided ${HYPERSPHERE_LEVEL} times into ${HYPERSPHERE_TETS} tets inscribed in the 3-sphere (an approximation about 5 % below the true hypervolume).`,
+    description: `The 4-ball of radius 1, hypervolume π²/2 ≈ ${approx(Math.PI ** 2 / 2)}, whose slice at offset c is a ball of radius √(1 − c²), drawn as the 16-cell subdivided ${HYPERSPHERE_LEVEL} times into ${HYPERSPHERE_TETS} tets inscribed in the 3-sphere (an inscribed approximation about 1.4 % below the true hypervolume).`,
     create: () => hypersphere(1, HYPERSPHERE_LEVEL),
   },
   {
@@ -167,6 +168,7 @@ const CURVED_ENTRIES: readonly ShapeEntry[] = [
     // §3.3: the fibres lie on the unit S³; stereographic projection is
     // conformal and sends circles to circles or lines.
     description: `${HOPF_FIBERS} fibres of the Hopf map S³ → S², each a great circle of the unit 3-sphere and any two of them linked once, drawn as a wire only (there is no solid to slice); stereographic projection turns them into circles on nested tori.`,
+    defaultProjection: 'stereographic',
     create: () => hopfShape(HOPF_FIBERS, HOPF_POINTS_PER_FIBER),
   },
 ];

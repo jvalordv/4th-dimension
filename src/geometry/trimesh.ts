@@ -57,10 +57,22 @@ export function surfaceArea(m: TriMesh3): number {
 }
 
 /**
- * Merge vertices closer than `tol` (checked against the 27 neighbouring grid
- * cells, so points straddling a cell boundary still merge).
+ * Weld vertices: each vertex is merged into the first earlier representative
+ * within `tol` of it (searched over the 27 neighbouring grid cells, so points
+ * straddling a cell boundary still merge). By default the merge is greedy,
+ * not transitive: in a chain 0, 0.9·tol, 1.8·tol the last point stays
+ * separate. What is guaranteed is that every vertex lies within tol of its
+ * representative, so clusters have diameter ≤ 2·tol and points farther than
+ * 2·tol apart are never merged. Coincident slice vertices differ only by
+ * float32 rounding, far below tol, so this suffices for cleaning slices.
+ *
+ * With `transitive` the weld is the union-find closure of "within tol":
+ * every chain merges, cluster diameter is unbounded in principle. Use it for
+ * diagnostics (closedness checks), where a crack between two copies of one
+ * point matters more than cluster size.
  */
-export function weldVertices(m: TriMesh3, tol = 1e-6): TriMesh3 {
+export function weldVertices(m: TriMesh3, tol = 1e-6, transitive = false): TriMesh3 {
+  if (transitive) return weldTransitive(m, tol);
   const buckets = new Map<string, number[]>();
   const remap = new Uint32Array(m.positions.length / 3);
   const positions: number[] = [];
@@ -98,6 +110,62 @@ export function weldVertices(m: TriMesh3, tol = 1e-6): TriMesh3 {
       if (list) list.push(found); else buckets.set(key, [found]);
     }
     remap[i] = found;
+  }
+  const indices = new Uint32Array(m.indices.length);
+  for (let i = 0; i < indices.length; i++) indices[i] = remap[m.indices[i]];
+  return { positions: Float32Array.from(positions), indices, sourceW: Float32Array.from(sourceW) };
+}
+
+function weldTransitive(m: TriMesh3, tol: number): TriMesh3 {
+  const n = m.positions.length / 3;
+  const parent = new Int32Array(n);
+  for (let i = 0; i < n; i++) parent[i] = i;
+  const find = (i: number): number => {
+    while (parent[i] !== i) { parent[i] = parent[parent[i]]; i = parent[i]; }
+    return i;
+  };
+  const inv = 1 / tol;
+  const tol2 = tol * tol;
+  const buckets = new Map<string, number[]>();
+  const cell = (i: number): [number, number, number] => [
+    Math.floor(m.positions[3 * i] * inv), Math.floor(m.positions[3 * i + 1] * inv), Math.floor(m.positions[3 * i + 2] * inv),
+  ];
+  for (let i = 0; i < n; i++) {
+    const key = cell(i).join(',');
+    const list = buckets.get(key);
+    if (list) list.push(i); else buckets.set(key, [i]);
+  }
+  for (let i = 0; i < n; i++) {
+    const [cx, cy, cz] = cell(i);
+    for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) for (let dz = -1; dz <= 1; dz++) {
+      const list = buckets.get(`${cx + dx},${cy + dy},${cz + dz}`);
+      if (!list) continue;
+      for (const j of list) {
+        if (j <= i) continue;
+        const ex = m.positions[3 * i] - m.positions[3 * j];
+        const ey = m.positions[3 * i + 1] - m.positions[3 * j + 1];
+        const ez = m.positions[3 * i + 2] - m.positions[3 * j + 2];
+        if (ex * ex + ey * ey + ez * ez <= tol2) {
+          const a = find(i);
+          const b = find(j);
+          if (a !== b) parent[Math.max(a, b)] = Math.min(a, b);
+        }
+      }
+    }
+  }
+  // Representative = smallest index of each cluster; keep its coordinates.
+  const remap = new Uint32Array(n);
+  const newIndex = new Int32Array(n).fill(-1);
+  const positions: number[] = [];
+  const sourceW: number[] = [];
+  for (let i = 0; i < n; i++) {
+    const r = find(i);
+    if (newIndex[r] < 0) {
+      newIndex[r] = positions.length / 3;
+      positions.push(m.positions[3 * r], m.positions[3 * r + 1], m.positions[3 * r + 2]);
+      sourceW.push(m.sourceW[r] ?? 0);
+    }
+    remap[i] = newIndex[r];
   }
   const indices = new Uint32Array(m.indices.length);
   for (let i = 0; i < indices.length; i++) indices[i] = remap[m.indices[i]];
@@ -179,8 +247,14 @@ export function checkClosedOriented(m: TriMesh3): ManifoldReport {
   };
 }
 
-/** Weld, drop degenerate triangles, then check. Convenience for tests. */
+/**
+ * Transitively weld, drop index-collapsed and exactly zero-area triangles,
+ * then check closedness and orientation. Convenience for tests. No absolute
+ * area threshold is used: a nearly parallel hyperplane legitimately produces
+ * slivers of area far below any fixed tolerance, and dropping them opens
+ * cracks that are not there.
+ */
 export function analyseSlice(m: TriMesh3, tol = 1e-6): ManifoldReport & { volume: number; triangles: number } {
-  const clean = dropDegenerateTriangles(weldVertices(m, tol));
+  const clean = dropDegenerateTriangles(weldVertices(m, tol, true), 0);
   return { ...checkClosedOriented(clean), volume: signedVolume(clean), triangles: triangleCount(clean) };
 }

@@ -61,7 +61,7 @@ const intro = topic({
   math: `
 <p>Points are <code>p ∈ R^4</code>; rotations are the special orthogonal matrices <code>R</code> with <code>R^T R = I</code>, <code>det R = +1</code>. The six sliders set plane rotations <code>R_ij(θ)</code> (§2.1) combined in the fixed order <code>M = R_ZW · R_YW · R_YZ · R_XW · R_XZ · R_XY</code>, <code>XY</code> applied first (§2.2). <!-- MATH.md §2 --></p>
 <p>The projection view draws the rotated vertices <code>M p</code> through <code>P_d(x, y, z, w) = (x, y, z) · d/(d − w)</code> (perspective, eye at <code>(0, 0, 0, d)</code>), or <code>(x, y, z)</code> (orthographic), or <code>(x, y, z)/(1 − w)</code> (stereographic, for figures on the unit 3-sphere). <!-- MATH.md §3 --></p>
-<p>The slice view intersects the rotated object with the hyperplane <code>H(e_w, c) = { q : q_w = c }</code>. Equivalently it slices the unrotated object with <code>H(M^T e_w, c)</code> and reads the result in the chart with basis <code>(M^T e_x, M^T e_y, M^T e_z)</code>, so the slice appears in the object's own coordinates (§4). Every solid is a closed, outward-oriented tetrahedral boundary complex (§5), sliced by marching tetrahedra (§6); the result is a closed oriented triangle mesh whose signed volume is positive. <!-- MATH.md §4, §5, §6 --></p>
+<p>The slice view intersects the rotated object with the hyperplane <code>H(e_w, c) = { q : q_w = c }</code>. Equivalently it slices the unrotated object with <code>H(M^T e_w, c)</code> and reads the result in the chart with basis <code>(M^T e_x, M^T e_y, M^T e_z)</code>, whose coordinates <code>(M^T e_k) · p = (M p)_k</code> are the viewer's <code>x, y, z</code> of the rotated point: for <code>M = I</code> this shows the object's own <code>x, y, z</code> unchanged (§4), and in general the slice appears exactly as the rotated object sits in our space. Every solid is a closed, outward-oriented tetrahedral boundary complex (§5), sliced by marching tetrahedra (§6); the result is a closed oriented triangle mesh whose signed volume is positive. <!-- MATH.md §4, §5, §6 --></p>
 <p>The data are checked, not drawn by hand: hypervolumes come out as cone sums over boundary tets (§7) and agree with the catalogue of §8, and the slice volume integrates over <code>c</code> to the hypervolume along any direction (Cavalieri). <!-- MATH.md §7, §8 --></p>`,
 });
 
@@ -84,7 +84,7 @@ const viewProjection = topic({
 <ul>
 <li>Orthographic: <code>(x, y, z, w) ↦ (x, y, z)</code>, a linear map with kernel <code>span(e_w)</code>. <!-- MATH.md §3.1 --></li>
 <li>Perspective: eye at <code>(0, 0, 0, d)</code>, <code>d &gt; 0</code>, image hyperplane <code>w = 0</code>. The ray from the eye through <code>p</code> meets the image hyperplane at <code>P_d(x, y, z, w) = (x, y, z) · d/(d − w)</code>, valid for <code>w &lt; d</code>. The viewer clamps the denominator <code>d − w</code> below by a small positive value, so points at or beyond the eye are pushed far away rather than inverted. <!-- MATH.md §3.2 --></li>
-<li>Stereographic, for <code>|p| = 1</code>: projection from the pole <code>(0, 0, 0, 1)</code> onto <code>w = 0</code>, <code>S(x, y, z, w) = (x, y, z)/(1 − w)</code>. It is conformal and maps circles of <code>S^3</code> to circles or lines of <code>R^3</code>. <!-- MATH.md §3.3 --></li>
+<li>Stereographic, for <code>|p| = 1</code>: projection from the pole <code>(0, 0, 0, 1)</code> onto <code>w = 0</code>, <code>S(x, y, z, w) = (x, y, z)/(1 − w)</code>. It is conformal and maps circles of <code>S^3</code> to circles or lines of <code>R^3</code>. The pole itself has no image (it is the point at infinity); the viewer draws points within <code>10⁻⁶</code> of it far out along their own direction rather than at the origin. <!-- MATH.md §3.3 --></li>
 </ul>
 <h3>Reasons</h3>
 <p>Because the perspective scale depends on <code>w</code> alone, every point of a hyperplane <code>w = c</code> is scaled by the same factor <code>d/(d − c)</code>; for the tesseract with <code>d = 3</code> the cells at <code>w = ±1</code> are drawn at <code>3/2</code> and <code>3/4</code>. Both projections send straight lines to straight lines, so a polytope's edges are drawn as segments and its faces as planar polygons. <!-- MATH.md §3.2 --></p>
@@ -141,7 +141,7 @@ const color = topic({
 <p>In the projection view each vertex is coloured by its <code>w</code> coordinate after rotation and before projection: the depth along the invisible axis that the projection discards. In the slice view each slice vertex is coloured by the <code>w</code> of the corresponding 4D point <em>before</em> rotation: where in the object's own fourth direction the visible material came from. The map from <code>w</code> to colour is a fixed two-ended gradient, cool blue for negative, near-white at <code>w = 0</code>, warm orange-red for positive, with the object's <code>w</code> extent at the ends. <!-- MATH.md §10 --></p>
 <p>Consequences: an unrotated object pushed through <code>w = c</code> gives a slice of one uniform colour that shifts with <code>c</code>, because every point in it has source <code>w = c</code>. Once the object is tilted (<code>XW</code>, <code>YW</code>, <code>ZW</code>), one slice contains material from several layers and shows a gradient across it; the direction of the gradient is the direction of the tilt. In the projection view the <code>w = +1</code> cube of the tesseract is warm and the <code>w = −1</code> cube is cool. <!-- MATH.md §10, §3.2 --></p>`,
   math: `
-<p>Let <code>g : [t_min, t_max] → colour</code> be the fixed gradient with <code>g(0)</code> the midpoint colour. Projection view: vertex <code>p</code> gets <code>g(w(M p))</code>, where <code>w(·)</code> is the fourth coordinate and <code>M</code> the composite rotation of §2.2; the viewer spans <code>g</code> over <code>[−R, R]</code>, <code>R</code> the shape's radius, because <code>|w(M p)| ≤ |p| ≤ R</code> for every rotation. Slice view: a slice vertex <code>q</code> corresponds to the unrotated point <code>p = unchart(H(M^T e_w, c), q)</code> and gets <code>g(w(p))</code>; the viewer spans <code>g</code> over the object's own <code>w</code> range <code>[w_min, w_max]</code>. <!-- MATH.md §10, §4 --></p>
+<p>Let <code>g : [t_min, t_max] → colour</code> be the fixed gradient with <code>g(0)</code> the midpoint colour. Projection view: vertex <code>p</code> gets <code>g(w(M p))</code>, where <code>w(·)</code> is the fourth coordinate and <code>M</code> the composite rotation of §2.2; the viewer spans <code>g</code> over <code>[−R, R]</code>, <code>R</code> the shape's radius, because <code>|w(M p)| ≤ |p| ≤ R</code> for every rotation. Slice view: a slice vertex <code>q = (q_1, q_2, q_3)</code> corresponds to the unrotated point <code>p = M^T (q_1, q_2, q_3, c)</code> (<code>q</code> lifted into <code>w = c</code> and rotated back; equivalently <code>unchart</code> on <code>H(M^T e_w, c)</code> with the viewer's basis <code>(M^T e_x, M^T e_y, M^T e_z)</code>, the rows of <code>M</code>) and gets <code>g(w(p))</code>; the viewer spans <code>g</code> over the object's own <code>w</code> range <code>[w_min, w_max]</code>. <!-- MATH.md §10, §4 --></p>
 <p>For a symmetric range the map is linear, <code>t = 1/2 + w/(2 w_max)</code>; for an asymmetric range (the 5-cell has <code>w ∈ [−1/√5, 4/√5]</code>) each side is scaled by its own extent so that both ends of the object reach the ends of the gradient while <code>w = 0</code> stays at the midpoint. <!-- MATH.md §10, §8.1 --></p>
 <p>Why the slice colour is uniform without rotation: with <code>M = I</code> every point of the slice satisfies <code>w(p) = c</code>, so <code>g(w(p)) = g(c)</code>. After a rotation the slice points satisfy <code>(M^T e_w) · p = c</code> but their <code>w(p) = e_w · p</code> varies, and the variation is linear across the slice. <!-- MATH.md §4, §10 --></p>`,
 });
@@ -218,7 +218,7 @@ function rotationTopic(plane: RotationPlane): Explainer {
 <p>Turning here and turning in the <code>${partner}</code> plane never interfere with each other: you can do them in either order and get the same result.</p> <!-- MATH.md §2.1 -->`;
 
   const intermediate = `
-<p>A 4D rotation turns one plane and leaves the complementary plane fixed; there are six coordinate planes, hence six sliders. <code>${plane}</code> turns the <code>${a}</code> axis toward the <code>${b}</code> axis (positive angle) and fixes the <code>${partner}</code> plane pointwise. ${hyper
+<p>A <em>simple</em> 4D rotation turns one plane and leaves the complementary plane pointwise fixed; a general 4D rotation turns two complementary planes at once (§2.3). There are six coordinate planes, hence six elementary simple rotations and six sliders. <code>${plane}</code> turns the <code>${a}</code> axis toward the <code>${b}</code> axis (positive angle) and fixes the <code>${partner}</code> plane pointwise. ${hyper
     ? `It has no 3D counterpart: it moves material along <code>w</code>, out of or into our space.`
     : `It is the ordinary 3D rotation about the <code>${fixedAxis3}</code> axis.`} <!-- MATH.md §2.1 --></p>
 <p>Rotations in disjoint planes commute: <code>${plane}</code> commutes with <code>${partner}</code> (<code>XY</code> with <code>ZW</code>, <code>XZ</code> with <code>YW</code>, <code>XW</code> with <code>YZ</code>); rotations in planes sharing an axis do not, in general. The viewer composes the six angles in a fixed order, <code>XY</code> first and <code>ZW</code> last; <code>${plane}</code> is applied ${ORDINAL[order]}. <!-- MATH.md §2.1, §2.2 --></p>
@@ -269,7 +269,7 @@ const tesseract = shapeTopic({
   viewNote: 'the cube inside a cube; switch to the slice view and tilt the object for the point, tetrahedron, octahedron sequence.',
   eli5: `
 <p>A square has 4 corners and 4 sides. A cube has 8 corners, 12 edges and 6 square faces. Take one more step in the same direction and you get the tesseract, the 4D cube: 16 corners, 32 edges, 24 squares, and 8 cubes as its "sides".</p>
-<p>Its shadow in perspective is a small cube inside a big cube. The eight cubes are the inner cube, the outer cube and the six wedge-shaped cubes joining them. In 4D they are all the same size and all perfect cubes; the inner one only looks small because it is farther from the lamp.</p>
+<p>Its shadow in perspective is a small cube inside a big cube. The eight cubes are the inner cube, the outer cube and the six cubes joining them, each drawn as a flat-topped pyramid (a frustum) with a face of the outer cube as its big end and a face of the inner cube as its small end. In 4D they are all the same size and all perfect cubes; the inner one only looks small because it is farther from the lamp.</p>
 <p>Pushed straight through our space, the tesseract appears as a full-size cube all at once, stays a cube, and vanishes all at once. Tilted onto its longest diagonal first, it enters as a point, grows into a tetrahedron, becomes an eight-sided octahedron halfway through, and shrinks back the same way.</p> <!-- MATH.md §8, §3.2, §8.4 -->`,
   intermediate: `
 <p>Vertices <code>(±1, ±1, ±1, ±1)</code>: 16 vertices, 32 edges, 24 square faces, 8 cubic cells; Euler's relation <code>16 − 32 + 24 − 8 = 0</code>. Each vertex has 4 neighbours (change one coordinate), each edge has length 2, and the hypervolume is <code>2^4 = 16</code>. <!-- MATH.md §8, §5.3 --></p>
@@ -336,7 +336,7 @@ const cell24 = shapeTopic({
   id: SHAPE_IDS.cell24,
   title: '24-cell',
   view: 'slice',
-  viewNote: 'octahedron, truncated octahedron, cuboctahedron and back as it passes through; the projection view shows a cuboctahedron with two octahedra inside.',
+  viewNote: 'octahedron, truncated octahedron, cuboctahedron and back as it passes through; the projection view shows a cuboctahedron with two octahedra: orthographically both just touch its square faces from inside, in perspective the nearer one pokes out through them and the farther one sits inside.',
   eli5: `
 <p>The odd one out. Every other regular 4D shape has a 3D cousin: the tesseract is a cube, the 5-cell a tetrahedron, the 16-cell an octahedron, and the 120- and 600-cells the twelve- and twenty-sided dice. The 24-cell has none. It has 24 corners, 96 edges, 96 triangles and 24 octahedra, and it is its own partner.</p>
 <p>Its corners sit exactly at the centres of the 24 squares of the tesseract.</p>
@@ -424,7 +424,7 @@ const duocylinder = shapeTopic({
   view: 'slice',
   viewNote: 'a cylinder whose height changes with the offset while its radius stays fixed; the wire in the projection view is the Clifford torus, a round torus under stereographic projection.',
   eli5: `
-<p>A can (a cylinder) is a disc swept along a straight line. The duocylinder is a disc swept around a circle in a completely separate pair of directions: a disc times a disc. It is round in two independent ways at once.</p>
+<p>A can (a cylinder) is a disc swept along a straight line. The duocylinder is a disc swept over every point of a second disc that lies in a completely separate pair of directions: a disc times a disc. It is round in two independent ways at once.</p>
 <p>Its skin is two doughnut-shaped solids glued to each other along a torus, the Clifford torus, which is what the shadow view draws.</p>
 <p>Pushed straight through our space it is a can whose height grows and shrinks while its radius never changes.</p> <!-- MATH.md §8.6 -->`,
   intermediate: `
@@ -499,7 +499,7 @@ const torusPrism = shapeTopic({
   viewNote: 'a doughnut that holds its shape while passing straight through, and sheared or split rings when tilted; the projection view shows a doughnut inside a doughnut.',
   eli5: `
 <p>A doughnut swept along the hidden direction. Pushed straight through our space, a doughnut appears, holds its shape, and vanishes.</p>
-<p>Tilt it first and the slice becomes a stretched doughnut cut off by two flat planes; cut the right way it can split into two separate rings, or show a ring with a hole in it, exactly as a knife through a doughnut can.</p>
+<p>Tilt it first and the slice becomes a stretched doughnut cut off by two flat planes; cut the right way it can split into two separate chunks, or show a ring with a hole in it, exactly as a knife through a doughnut can leave two pieces or a ring-shaped cut face.</p>
 <p>Its shadow in perspective is a doughnut inside a doughnut, joined by spokes.</p> <!-- MATH.md §9.1 -->`,
   intermediate: `
 <p>The extrusion of a torus with major radius <code>R</code> and minor radius <code>r</code> (volume <code>2π² R r²</code>): <code>P = T × [−h, h]</code>, hypervolume <code>2π² R r² · 2h</code>. The torus surface has Euler characteristic 0 and the solid has a hole, so its planar sections can have holes too (a horizontal cut through the middle is an annulus). <!-- MATH.md §9.1 --></p>
@@ -533,7 +533,7 @@ const human = shapeTopic({
   viewNote: 'the figure passing straight through unchanged, then as sheared slabs when tilted in XW, YW or ZW.',
   eli5: `
 <p>There is no such thing as a 4D human, and this is not one. It is an ordinary 3D figure built from simple shapes, swept a little way along the hidden direction so that it has some 4D thickness.</p>
-<p>Flat creatures watching a person step through their sheet would see two footprints, then two leg-shaped slices, then a body-shaped one, changing as the person moved. We would see a four-dimensional being in the same way, as 3D slices. Here, pushed straight through, you see the whole figure unchanged for a while; tilt it to see sheared, cut-off versions.</p> <!-- MATH.md §9, §9.1 -->`,
+<p>Flat creatures living in the floor, watching a person sink through it, would see two footprints, then two oval slices through the legs, then a single larger slice through the body, changing as the person passed. We would see a four-dimensional being in the same way, as 3D slices. Here, pushed straight through, you see the whole figure unchanged for a while; tilt it to see sheared, cut-off versions.</p> <!-- MATH.md §9, §9.1 -->`,
   intermediate: `
 <p>There is no canonical 4D version of a 3D object; the viewer makes an explicit, named choice. This figure is a humanoid assembled from 3D primitives and extruded along <code>w</code>: <code>P = S × [−h, h]</code>. <!-- MATH.md §9, §9.1 --></p>
 <p>Slice by <code>w = c</code>, <code>|c| &lt; h</code>: the figure itself. Tilted: a sheared slab, an affine image of the figure clipped between two parallel planes, which is what the "pass-through" of a tilted prism always shows. In the projection view the two caps appear as nested copies of the figure under perspective. The alternative liftings MATH.md names (spinning about a plane, signed distance fields) are not in this build. <!-- MATH.md §9.1, §9.2, §9.3 --></p>`,
@@ -547,7 +547,7 @@ const mug = shapeTopic({
   view: 'slice',
   viewNote: 'the mug passing straight through unchanged, and sheared slabs with a hole through the handle when tilted.',
   eli5: `
-<p>A mug is not a 4D object, and there is no single right way to make one. This is an ordinary 3D mug, a cup with a handle, swept a little way along the hidden direction.</p>
+<p>A mug is not a 4D object, and there is no single right way to make one. This is an ordinary 3D mug shape, a solid cylinder with a ring handle (not hollowed out), swept a little way along the hidden direction.</p>
 <p>Pushed straight through our space the whole mug is there, unchanged, for a while, then gone. Tilt it and you see a stretched mug cut off by two flat planes; where the cut passes through the handle, the slice has a hole in it.</p> <!-- MATH.md §9, §9.1 -->`,
   intermediate: `
 <p>No canonical 4D mug exists; this one is the extrusion <code>P = S × [−h, h]</code> of a 3D mug built from primitives. The handle gives the solid a hole, so planar sections through it have holes, which the cap slicer detects by nesting parity before triangulating. <!-- MATH.md §9, §9.1 --></p>

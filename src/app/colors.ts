@@ -1,9 +1,10 @@
 /**
  * Colour encoding of the fourth coordinate. MATH.md §10: colour is data, not
  * decoration. In the projection view a vertex is coloured by its w after
- * rotation and before projection; in the slice view by the w of the source
- * 4D point before rotation. Both go through one fixed two-ended gradient with
- * w = 0 at the midpoint and the object's w extent at the ends.
+ * rotation and before projection, on a symmetric scale over [−R, R] (the
+ * rotated w can reach the whole radius); in the slice view by the w of the
+ * source 4D point before rotation, over the object's own w extent. Both use
+ * one fixed two-ended gradient with w = 0 at the midpoint.
  */
 
 /** sRGB colour with channels in [0, 1]. */

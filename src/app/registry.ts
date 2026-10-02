@@ -13,6 +13,12 @@ export interface ShapeEntry {
   create: () => Shape4;
   /** Suggested perspective eye distance; default derives from radius. */
   projectionDistance?: number;
+  /**
+   * Projection to switch to when this shape is selected (figures on the unit
+   * 3-sphere want stereographic). Shapes without one revert a stereographic
+   * view to perspective, since stereographic normalises every point to S³.
+   */
+  defaultProjection?: 'perspective' | 'orthographic' | 'stereographic';
 }
 
 const entries = new Map<string, ShapeEntry>();

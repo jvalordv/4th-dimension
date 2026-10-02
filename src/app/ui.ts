@@ -123,7 +123,9 @@ export function mountUI(store: StateStore, panel: ExplainerPanel, els: UIElement
     params.distance = store.perspectiveDistance;
     const r = store.radius;
     // d must exceed every w (< radius) for the eye to be outside the shape, §3.2.
-    distanceCtrl.min(Math.max(1.05 * r, 0.5)).max(Math.max(4 * store.perspectiveDistance, 2 * r + 2));
+    // Bounds depend on the shape only; deriving the max from the current value
+    // would move the track under the thumb while dragging and run away.
+    distanceCtrl.min(Math.max(1.05 * r, 0.5)).max(Math.max(10, 6 * r));
     distanceCtrl.enable(state.projection.kind === 'perspective');
     gui.controllersRecursive().forEach((c: Controller) => c.updateDisplay());
   };

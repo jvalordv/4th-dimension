@@ -477,8 +477,9 @@ describe('compound shapes', () => {
 
 describe('random hyperplanes through extruded solids', () => {
   it('every slice of an extruded torus or box is closed and consistent, including planes through vertices', () => {
-    // Planes through mesh vertices at a cap level exercise the §6
-    // perturbation shared by the lateral slice and the cap sections.
+    // Planes through mesh vertices at a cap level exercise the §6 symbolic
+    // perturbation (s ≥ 0 is positive), which the lateral slice and the cap
+    // sections must apply to identical signed distances.
     const shapes = [extrude(torus(1, 0.4, 24, 12), 0.3, 't'), extrude(box(2, 2, 2), 1, 'b'), extrude(cylinder(1, 2, 16), 1, 'c')];
     const axisNormals: Vec4[] = [[1, 0, 0, 0], [0, 0, 1, 0], [1, 1, 1, 1], [1, 0, 0, 1], [0, 0, 1, 1], [1, 1, 0, 0]];
     const r = rng(13);
@@ -513,7 +514,7 @@ describe('random hyperplanes through extruded solids', () => {
       expect(Math.abs(w)).toBeLessThanOrEqual(0.5 + 1e-6);
       if (Math.abs(Math.abs(w) - 0.5) < 1e-6) caps++;
       // sourceW is the w coordinate of the vertex's 4D point, which lies in h
-      // (up to the Float32 output and the §6 nudge of ~1e-10).
+      // (up to the Float32 output).
       const p = unchart(h, [sl.positions[3 * i], sl.positions[3 * i + 1], sl.positions[3 * i + 2]]);
       expect(dot4(h.normal, p)).toBeCloseTo(h.offset, 6);
       expect(p[3]).toBeCloseTo(w, 5);

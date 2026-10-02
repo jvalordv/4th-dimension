@@ -12,11 +12,11 @@
  *   where the cap meets the hyperplane, lifted and charted.
  */
 import type { Edge, Hyperplane, Shape4, Tet, TetComplex, TriMesh3, Vec3, Vec4, WireMesh4 } from '../math/types';
-import { chart } from '../math/hyperplane';
+import { chart, signedDistance } from '../math/hyperplane';
 import { cross3, dot3, dot4, length3, scale3, sub3 } from '../math/vec';
 import type { Mesh3, Triangle } from './mesh3';
 import { mesh3Bounds, mesh3Edges } from './mesh3';
-import { planarSection, planeBasis, triangulateSection } from './section';
+import { planarSectionFromDistances, planeBasis, triangulateSection } from './section';
 import { sliceTets } from './slice';
 import { tetNormal } from './tets';
 import { mergeMeshes } from './trimesh';
@@ -207,11 +207,10 @@ export function conformTriangulationToLoops(tri: Mesh3, loops: readonly (readonl
  * Remove points closer than `tol` to the previously kept point (cyclically,
  * so the last kept point is also checked against the first). planarSection
  * only removes exactly coincident steps; a plane passing within rounding of
- * a mesh vertex (after perturbAwayFromVertices, within ~1e-9) leaves
- * clusters of distinct points that the Float32 slice output cannot tell
- * apart and that welding merges anyway. Collapsing them first keeps the
- * triangulation free of near-zero triangles, so that every piece made by
- * conformTriangulationToLoops has a well defined orientation.
+ * a mesh vertex leaves clusters of distinct points that the Float32 slice
+ * output cannot tell apart and that welding merges anyway. Collapsing them
+ * first keeps the triangulation free of near-zero triangles, so that every
+ * piece made by conformTriangulationToLoops has a well defined orientation.
  */
 export function dedupeLoop(loop: readonly Vec3[], tol: number): Vec3[] {
   const out: Vec3[] = [];
@@ -316,59 +315,38 @@ export class ExtrudedSolid implements Shape4 {
    * Slice by h (MATH.md §9.1): marching tetrahedra over the lateral tets
    * (§6) merged with the planar sections of the two caps. Vertices are not
    * shared between the parts; the lateral boundary and the cap loops pass
-   * through the same crossing points of the mesh edges at w = ±h, so the
-   * merged mesh is closed after welding.
+   * through the same crossing points of the mesh edges at w = ±h (the cap
+   * is cut with the lateral slicer's own vertex classification, see
+   * capSlice), so the merged mesh is closed after welding. The hyperplane
+   * is used exactly as given: §6's symbolic perturbation (s ≥ 0 counts as
+   * positive) is what makes a hyperplane through cap-level vertices
+   * watertight, and no literal offset shift is needed. (An earlier version
+   * lowered the offset by 2ε when a vertex lay within ε of h; in the cap
+   * plane that shift is divided by |n_xyz| and misplaces the clipping plane
+   * of a nearly parallel hyperplane by a visible amount.)
    */
   slice(h: Hyperplane): TriMesh3 {
-    const hh = this.perturbAwayFromVertices(h);
-    const lateral = sliceTets(this.complex.positions, this.complex.tets, hh);
+    const lateral = sliceTets(this.complex.positions, this.complex.tets, h);
     const parts: TriMesh3[] = [lateral];
     for (const w0 of [-this.halfHeight, this.halfHeight]) {
-      const cap = this.capSlice(hh, w0);
+      const cap = this.capSlice(h, w0);
       if (cap) parts.push(cap);
     }
     return parts.length === 1 ? lateral : mergeMeshes(parts);
   }
 
   /**
-   * MATH.md §6's symbolic perturbation made literal. sliceTets and
-   * planarSection both count s ≥ 0 as positive, but they compute the signed
-   * distance of a cap-level vertex with different arithmetic (4D dot minus
-   * offset versus a normalised 3D dot minus a scaled offset), so a vertex
-   * lying on h up to rounding can be positive for one and negative for the
-   * other, and the lateral boundary and the cap loop then differ
-   * combinatorially around it. Whenever a lateral vertex lies within
-   * ε = 1e-10 · radius of h, the offset is lowered by 2ε (at most four
-   * times, should another vertex land near the new offset), which puts
-   * every vertex at least ε from the hyperplane: both classifications then
-   * agree, and the result is the slice at c − O(ε), the limit from below that
-   * §6 prescribes, moved by far less than the Float32 output resolves. Not
-   * applied when the caps are parallel to h (n = ±e_w), where sliceTets is
-   * watertight on its own and the §6 limit is produced exactly.
-   */
-  private perturbAwayFromVertices(h: Hyperplane): Hyperplane {
-    const n = h.normal;
-    if (Math.hypot(n[0], n[1], n[2]) <= PARALLEL_TOL) return h;
-    const eps = 1e-10 * this.r;
-    let offset = h.offset;
-    for (let attempt = 0; attempt < 4; attempt++) {
-      let near = false;
-      for (const p of this.complex.positions) {
-        if (Math.abs(dot4(n, p) - offset) < eps) { near = true; break; }
-      }
-      if (!near) break;
-      offset -= 2 * eps;
-    }
-    return offset === h.offset ? h : { normal: h.normal, offset, basis: h.basis };
-  }
-
-  /**
    * Slice of the cap S × {w0}. With n = (n_xyz, n_w) and offset c, a point
-   * (q, w0) lies in h iff n_xyz · q = c − n_w w0: a plane in R^3, which is
-   * handed to planarSection with n_xyz normalised and k scaled by the same
-   * factor. The cap's 4D outward normal is sign(w0) e_w; projected into h
-   * and charted it is capDir = chart(h, sign(w0) e_w) (chart already drops
-   * the n component since the basis is ⊥ n). Its length is |n_xyz|, so it
+   * (q, w0) lies in h iff n_xyz · q = c − n_w w0: a plane in R^3. The cap
+   * is sectioned with the 4D signed distances s = n · (q, w0) − c of its
+   * vertices, the very numbers sliceTets computes for the same lateral
+   * vertices (signedDistance on the same positions), so a vertex on h up to
+   * rounding is positive for both or negative for both and the cap loops
+   * meet the lateral boundary edge for edge (MATH.md §6). Recomputing s from
+   * the normalised 3D normal and a rescaled offset would not guarantee this.
+   * The cap's 4D outward normal is sign(w0) e_w; projected into h and
+   * charted it is capDir = chart(h, sign(w0) e_w) (chart already drops the
+   * n component since the basis is ⊥ n). Its length is |n_xyz|, so it
    * vanishes exactly when the caps are parallel to h, and then nothing is
    * emitted.
    *
@@ -390,8 +368,11 @@ export class ExtrudedSolid implements Shape4 {
     if (dot3(capDir, capDir) <= PARALLEL_TOL * PARALLEL_TOL) return null;
 
     const m = scale3(nxyz, 1 / len);
-    const k = (h.offset - n[3] * w0) / len;
-    const { loops } = planarSection(this.mesh, m, k);
+    const V = this.mesh.positions.length;
+    const base = w0 < 0 ? 0 : V; // lateralComplex: (v, −h) first, then (v, +h)
+    const s = new Float64Array(V);
+    for (let i = 0; i < V; i++) s[i] = signedDistance(h, this.complex.positions[base + i]);
+    const { loops } = planarSectionFromDistances(this.mesh, s);
     if (loops.length === 0) return null;
 
     const lift = (q: Vec3, w: number): Vec3 => chart(h, [q[0], q[1], q[2], w]);

@@ -102,18 +102,26 @@ export class SliceRenderable {
 
   get triangleCount(): number { return this.triangles; }
 
+  /** Remove the drawn slice: geometries disposed, nothing visible, no triangles. */
+  clear(): void {
+    this.mesh.geometry.dispose();
+    this.edges.geometry.dispose();
+    this.mesh.geometry = new BufferGeometry();
+    this.edges.geometry = new BufferGeometry();
+    this.mesh.visible = false;
+    this.edges.visible = false;
+    this.triangles = 0;
+  }
+
   /** Replace the drawn slice; the previous geometries are disposed. */
   setMesh(tri: TriMesh3, scale: WColorScale): void {
+    if (tri.indices.length === 0) {
+      this.clear();
+      return;
+    }
     this.mesh.geometry.dispose();
     this.edges.geometry.dispose();
     this.triangles = tri.indices.length / 3;
-    if (this.triangles === 0) {
-      this.mesh.geometry = new BufferGeometry();
-      this.edges.geometry = new BufferGeometry();
-      this.mesh.visible = false;
-      this.edges.visible = false;
-      return;
-    }
     const geom = buildSliceGeometry(tri, scale);
     this.mesh.geometry = geom;
     const lines = featureEdges(geom.getAttribute('position').array, FEATURE_EDGE_DEGREES);

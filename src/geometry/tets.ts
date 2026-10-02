@@ -98,11 +98,16 @@ export function validateTetComplex(
   const tol = (opts.degenerateTol ?? 1e-9) * Math.max(scale, 1) ** 3;
 
   tets.forEach((t, ti) => {
+    let outOfRange = false;
     for (const idx of t) {
       if (!Number.isInteger(idx) || idx < 0 || idx >= positions.length) {
         errors.push(`tet ${ti} has out-of-range vertex ${idx}`);
+        outOfRange = true;
       }
     }
+    // A tet with a bad index has no geometry to measure: skip its volume and
+    // face bookkeeping so the report is still returned instead of throwing.
+    if (outOfRange) return;
     if (new Set(t).size !== 4) errors.push(`tet ${ti} repeats a vertex`);
     if (tetVolume6(positions, t) <= tol) degenerateTets++;
     for (const f of tetFaces(t)) {

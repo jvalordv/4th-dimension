@@ -45,6 +45,16 @@ export function fanTriangulate(faces: readonly number[][]): Uint32Array {
   return out;
 }
 
+/** Element counts of the tesseract wire (24 squares → 48 triangles, 32 edges), the reference density. */
+const REF_TRIANGLES = 48;
+const REF_EDGES = 96;
+
+/** 1 at or below the reference count, then √(ref / count), never below `floor`. */
+export function densityFactor(count: number, ref: number, floor: number): number {
+  if (count <= ref) return 1;
+  return Math.max(floor, Math.sqrt(ref / count));
+}
+
 /** Flatten edge pairs into a LineSegments index (2 entries per edge). */
 export function edgeIndices(edges: readonly Edge[]): Uint32Array {
   const out = new Uint32Array(edges.length * 2);
@@ -185,10 +195,18 @@ export class WireRenderable {
     this.color.needsUpdate = true;
   }
 
+  /**
+   * Additive blending sums overlapping elements, so a dense wire (the 120-cell's
+   * 2160 face triangles, an extruded mesh's thousands of quads) saturates to
+   * white at the opacity that suits the tesseract. Scale the requested opacity
+   * by √(reference / count), floored, so the total light stays comparable.
+   */
   setOpacity(o: WireOpacity): void {
-    this.edges.material.opacity = o.edges;
-    this.faces.material.opacity = o.faces;
-    this.points.material.opacity = o.vertices;
+    const f = densityFactor(this.triangleCount, REF_TRIANGLES, 0.04);
+    const e = densityFactor(this.edgeCount, REF_EDGES, 0.15);
+    this.edges.material.opacity = o.edges * e;
+    this.faces.material.opacity = o.faces * f;
+    this.points.material.opacity = o.vertices * e;
   }
 
   setVisible(faces: boolean, edges: boolean, vertices: boolean): void {

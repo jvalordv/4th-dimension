@@ -132,6 +132,18 @@ export function subdivideSphericalTets(positions: Vec4[], tets: readonly Tet[], 
  * Tet complex of the boundary S^3 of the 4-ball of radius R: the 16-cell's 16
  * tets subdivided `level` times (16·8^level tets), outward oriented. MATH.md
  * §8.5. Level 0 is the 16-cell itself (hypervolume 2/3 at R = 1, §8).
+ *
+ * Accuracy (measured, tests assert it): the complex is inscribed, so its
+ * hypervolume is below π²R⁴/2 by 86.5 %, 53.9 %, 19.1 %, 5.31 %, 1.36 % at
+ * levels 0..4, shrinking about 4× per level (second order in the edge
+ * length). The deficit sits mostly in the flat tets around the 16-cell's 8
+ * original vertices, whose hyperplanes are only 0.975R from the origin at
+ * level 3 (0.9936R at level 4); slices near the poles are correspondingly
+ * short (at c = 0.9R, 16 % along e_w at level 3). Level 3, the viewer's
+ * choice, is therefore a ~5 % approximation; level 4 costs 8× the tets.
+ * Seeding from the 600-cell instead (also allowed by §8.5) does not change
+ * the trade-off: its 600 tets are 21.7 % short, 4800 are 6.7 % and 38 400
+ * are 1.75 %, the same curve at equal tet count, so the 16-cell seed is kept.
  */
 export function hypersphereComplex(radius = 1, level = 3): TetComplex {
   if (!(radius > 0)) throw new Error('hypersphereComplex: radius must be positive');
@@ -268,22 +280,86 @@ export function hopfShape(fiberCount = 24, pointsPerFiber = 64): Shape4 {
 // ---- Clifford torus and duocylinder --------------------------------------
 
 /**
+ * cos(2πi/n) and sin(2πi/n) for i = 0..n−1, the vertices of the regular n-gon,
+ * built so that every coincidence forced by the symmetries the n-gon shares
+ * with the coordinate axes holds bit-exactly: the values at multiples of π/2
+ * are the exact 0 and ±1 (not sin π = 1.2e-16, cos 3π/2 = −1.8e-16), cos and
+ * sin at π/4 are both Math.SQRT1_2, and values related by the reflections
+ * θ ↦ −θ (every n), θ ↦ π − θ (even n), the quarter turns and θ ↦ π/2 − θ
+ * (4 | n) are the same number up to sign or a cos/sin swap. Each value is
+ * Math.cos/Math.sin of one representative angle in the fundamental domain
+ * [0, π/4] (4 | n), [0, π/2] (even n) or [0, π] (odd n), mapped back; it is
+ * at least as accurate as the directly rounded value (the representative
+ * angle is the smaller one) and differs from it by the rounding of the larger
+ * angle, measured ≤ 1.3e-15 for n ≤ 64.
+ *
+ * Exactness matters for slicing (MATH.md §6). The symbolic perturbation
+ * s ≥ 0 classifies vertices lying exactly in H alike, and a complex edge in H
+ * is then an edge of the slice. Two vertices that should both have, say,
+ * y = 0 but carry rounding noise of opposite signs fall in different classes,
+ * the slicer "crosses" the edge between them at a noise-determined interior
+ * point, and that point is a slice vertex on one side of the edge only: the
+ * zero-area triangle bridging the T-junction is discarded by the §6 cleaning
+ * and a hole remains. The hyperplanes spanned by two coordinate axes contain
+ * such edges of the Clifford torus grid and of the duocylinder's discs, and
+ * for r1 = r2 whole diagonal curves of the grid (cos α_i = −cos β_j); with
+ * this table all of them get s = 0 exactly. Coincidences that are algebraic
+ * rather than symmetric (cos π/3 = 1/2, cancellations of four terms in
+ * (1,1,1,1)·p) are not addressed here.
+ */
+function circleTable(n: number): { cos: number[]; sin: number[] } {
+  const cos: number[] = [];
+  const sin: number[] = [];
+  for (let i = 0; i < n; i++) {
+    // Reduce i to the fundamental domain, recording the symmetry that maps
+    // the representative r back to i.
+    let r = i;
+    let quarterTurns = 0; // θ ↦ θ + quarterTurns·π/2, applied last
+    let swap = false; // θ ↦ π/2 − θ
+    let flipSin = false; // θ ↦ −θ
+    let flipCos = false; // θ ↦ π − θ
+    if (n % 4 === 0) {
+      const q = n / 4;
+      quarterTurns = Math.floor(i / q);
+      r = i - quarterTurns * q;
+      if (2 * r > q) { r = q - r; swap = true; }
+    } else {
+      if (2 * r > n) { r = n - r; flipSin = true; }
+      if (n % 2 === 0 && 4 * r > n) { r = n / 2 - r; flipCos = true; }
+    }
+    let c: number;
+    let s: number;
+    if (r === 0) { c = 1; s = 0; }
+    else if (8 * r === n) { c = Math.SQRT1_2; s = Math.SQRT1_2; }
+    else { const theta = (TWO_PI * r) / n; c = Math.cos(theta); s = Math.sin(theta); }
+    if (swap) [c, s] = [s, c];
+    if (flipSin) s = -s;
+    if (flipCos) c = -c;
+    for (let k = 0; k < quarterTurns; k++) [c, s] = [-s, c];
+    cos.push(c + 0); // + 0 turns a −0 from the negations into +0
+    sin.push(s + 0);
+  }
+  return { cos, sin };
+}
+
+/**
  * The Clifford torus { x²+y² = r1², z²+w² = r2² } as an n × m quad grid:
  * vertex (i, j) at index i·m + j is (r1 cos α_i, r1 sin α_i, r2 cos β_j,
- * r2 sin β_j) with α_i = 2πi/n, β_j = 2πj/m; edges along both parameter
- * directions and one quad face per grid cell. With r1 = r2 = 1/√2 it lies on
- * the unit S^3 and its stereographic image is a round torus. MATH.md §8.6
+ * r2 sin β_j) with α_i = 2πi/n, β_j = 2πj/m (circleTable, so the coordinates
+ * at multiples of π/2 are exact); edges along both parameter directions and
+ * one quad face per grid cell. With r1 = r2 = 1/√2 it lies on the unit S^3
+ * and its stereographic image is a round torus. MATH.md §8.6
  */
 export function cliffordTorus(r1 = Math.SQRT1_2, r2 = Math.SQRT1_2, n = 48, m = 48): WireMesh4 {
   if (!Number.isInteger(n) || n < 3 || !Number.isInteger(m) || m < 3) {
     throw new Error('cliffordTorus: n and m must be integers ≥ 3');
   }
+  const a = circleTable(n);
+  const b = circleTable(m);
   const positions: Vec4[] = [];
   for (let i = 0; i < n; i++) {
-    const alpha = (TWO_PI * i) / n;
     for (let j = 0; j < m; j++) {
-      const beta = (TWO_PI * j) / m;
-      positions.push([r1 * Math.cos(alpha), r1 * Math.sin(alpha), r2 * Math.cos(beta), r2 * Math.sin(beta)]);
+      positions.push([r1 * a.cos[i], r1 * a.sin[i], r2 * b.cos[j], r2 * b.sin[j]]);
     }
   }
   const at = (i: number, j: number): number => ((i + n) % n) * m + ((j + m) % m);
@@ -366,12 +442,10 @@ export function duocylinderComplex(r1 = Math.SQRT1_2, r2 = Math.SQRT1_2, segment
   if (!Number.isInteger(segments) || segments < 3) throw new Error('duocylinderComplex: segments must be an integer ≥ 3');
   if (!Number.isInteger(rings) || rings < 1) throw new Error('duocylinderComplex: rings must be an integer ≥ 1');
   const n = segments;
-  const cosA: number[] = [];
-  const sinA: number[] = [];
-  for (let i = 0; i < n; i++) {
-    cosA.push(Math.cos((TWO_PI * i) / n));
-    sinA.push(Math.sin((TWO_PI * i) / n));
-  }
+  // Same table as cliffordTorus, so interior ring vertices share the exact
+  // zeros of the torus grid and axis-parallel edges lie exactly in the
+  // coordinate hyperplanes that contain them (see circleTable).
+  const { cos: cosA, sin: sinA } = circleTable(n);
 
   const positions: Vec4[] = cliffordTorus(r1, r2, n, n).positions;
   const perDisk = 1 + (rings - 1) * n; // interior disk vertices per circle step

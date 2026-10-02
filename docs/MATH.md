@@ -23,9 +23,11 @@ addition.
 
 ### 2.1 Plane rotations
 
-In 3-space a rotation has an axis. In 4-space a rotation has an invariant
-*plane*: the plane that turns, and the complementary plane that stays fixed.
-There are six coordinate planes, hence six elementary rotations.
+In 3-space a rotation has an axis. In 4-space a *simple* rotation has an
+invariant *plane*: the plane that turns, and the complementary plane that
+stays pointwise fixed (a general 4D rotation turns two complementary planes
+at once and fixes no plane, section 2.3). There are six coordinate planes,
+hence six elementary simple rotations.
 
 For a pair of axes `i < j`, the rotation by angle `θ` in the `(i, j)` plane is
 the matrix `R_ij(θ)` equal to the identity except
@@ -40,8 +42,13 @@ Convention: positive `θ` turns `e_i` toward `e_j`, i.e.
 
 The six planes, in canonical order: `XY (0,1)`, `XZ (0,2)`, `XW (0,3)`,
 `YZ (1,2)`, `YW (1,3)`, `ZW (2,3)`. The first, second and fourth are ordinary
-3D rotations (about the z, y and x axes respectively). The three involving `w`
-are the ones with no 3D counterpart.
+3D rotations, about the z, y and x axes respectively, but note the sense:
+`XY` and `YZ` coincide with the right-handed rotations about `+z` and `+x`,
+whereas `XZ(θ)` turns `e_x` toward `e_z`, which is the right-handed rotation
+about `-y`. In the usual 3D convention `R_y(φ) e_x = cos φ e_x - sin φ e_z`,
+so `R_XZ(θ) = R_y(-θ)`; a reader comparing with a textbook matrix about `y`
+must flip the sign. The three involving `w` are the ones with no 3D
+counterpart.
 
 Facts every implementation must satisfy:
 
@@ -158,8 +165,11 @@ basis whenever it is a basis. This is the exact analogue of
 
 A boundary tet `(a, b, c, d)` is *outward oriented* when
 `N = cross4(b - a, c - a, d - a)` points out of the solid. All tet lists in
-this project are outward oriented. For a star-shaped solid with interior point
-`o`, outwardness means `N · (a - o) > 0`.
+this project are outward oriented. For a solid that is star-shaped *with
+respect to* `o` (`o` in its kernel: every boundary point is visible from `o`),
+outwardness means `N · (a - o) > 0`. For an interior `o` outside the kernel
+the test flips the wrong tets. Any interior point of a convex solid is in the
+kernel, which covers every shape in section 8.
 
 ### 5.2 Validity
 
@@ -212,16 +222,41 @@ and may be dropped.
 
 Consequences that tests must check:
 
-- The slice of a valid tet complex is a closed, consistently oriented
-  triangle mesh (every edge in exactly two triangles, opposite directions),
-  after discarding zero-area triangles and merging coincident vertices.
+- At every offset where the slice has positive volume, the slice of a valid
+  tet complex is a closed, consistently oriented triangle mesh (every edge in
+  exactly two triangles, opposite directions), after discarding zero-area
+  triangles and merging coincident vertices. At a generic offset (no vertex
+  in `H`) no cleaning is needed. For a convex solid this is every offset
+  except the supporting ones described below.
 - Its signed volume (divergence theorem, `V = Σ (v_0 · (v_1 × v_2)) / 6`) is
-  positive.
+  then positive.
+
+Degenerate offsets. Because the output is the limit from below, a hyperplane
+that supports the solid from above (`c = max n · p` over the solid) gives a
+zero-volume slice unless a whole cell lies in `H`:
+
+- `H` touches a vertex or an edge: every emitted triangle is zero-area and the
+  cleaned output is empty (the 4-ball of §8.5 at `c = R`).
+- `H` contains a 2-face `F`: `F` is emitted *twice*, once by each tet adjacent
+  to it, with opposite orientations and nonzero area. The cleaned output is a
+  doubled flat polygon with every interior edge in four triangles, volume 0,
+  and it is *not* closed in the sense above. Examples: the tesseract with
+  `n = (0,0,1,1)/√2, c = √2` (the square `z = w = 1`), and the discretised
+  duocylinder of §8.6 at `w = r_2` when its polygon `P_2` has a vertex at
+  `(0, r_2)` (the disc `P_1 × {(0, r_2)}`).
+
+In general a 2-face of the complex lying in `H` is emitted twice exactly when
+both tets adjacent to it have their fourth vertex on the negative side (the
+solid is locally below `H` there) and once otherwise; for a convex solid the
+former happens only at a supporting offset. The slicer does not cancel such
+coincident pairs. Tests check closedness at positive-volume offsets only, and
+may check the zero-volume behaviour at supporting offsets.
 
 ## 7. Hypervolume and the slice integral
 
-For a star-shaped solid with interior point `o`, the 4-volume is the sum over
-boundary tets of cone volumes:
+For a solid star-shaped with respect to an interior point `o` (`o` in the
+kernel, as in 5.1; any interior point for a convex solid), the 4-volume is the
+sum over boundary tets of cone volumes:
 
 ```
 vol_4 = Σ_tets  | det [ a - o ; b - o ; c - o ; d - o ] | / 24 .
@@ -230,7 +265,9 @@ vol_4 = Σ_tets  | det [ a - o ; b - o ; c - o ; d - o ] | / 24 .
 For any unit `n`, the slice volume `A(c)` as a function of offset satisfies
 `∫ A(c) dc = vol_4` (Cavalieri). This is a strong, direction-independent
 consistency check between the slicer and the tet complex; tests integrate
-`A(c)` numerically along several random directions and compare.
+`A(c)` numerically along several random directions and compare. If `o` were
+outside the kernel, overlapping cones would be counted with absolute value
+and the sum would overestimate `vol_4`.
 
 ## 8. Catalogue of shapes with known answers
 
@@ -351,10 +388,13 @@ through an extruded object shows a sheared slab of the original.
 
 ### 9.2 Spin (rotation about a plane)
 
-For `S` in the half-space `z ≥ 0`, `spin(S) = { (x, y, z cos φ, z sin φ) }`.
-A disc spun about a line is a ball; a half-ball spun about a plane is a
-4-ball; a ball with `z > 0` spun this way is the 4D analogue of a torus. Not
-in the first build; the interface must leave room for it.
+For `S` in the half-space `z ≥ 0`, `spin(S) = { (x, y, z cos φ, z sin φ) }`:
+`S` is swept about the plane `z = 0`, the 4D analogue of a solid of
+revolution. One dimension down, a half-disc spun about its diameter is a
+ball; here a half-ball spun about its equatorial plane is a 4-ball, and a
+ball lying in `z > 0` spun this way is the 4D analogue of a solid torus (just
+as a disc in `y > 0` spun about the `x` axis is a torus, not a ball). Not in
+the first build; the interface must leave room for it.
 
 ### 9.3 Signed distance fields
 
@@ -370,5 +410,21 @@ by its `w` coordinate after rotation and before projection, so depth along the
 invisible axis is readable. In the slice view each slice vertex is coloured by
 the `w` coordinate of the corresponding 4D point *before* rotation, i.e. where
 in the object's own fourth direction the visible material came from. The map
-from `w` to colour is a fixed two-ended gradient with `w = 0` at the midpoint
-and the object's `w` extent at the ends.
+from `w` to colour is a fixed two-ended gradient with `w = 0` at the midpoint;
+the two views use different ends:
+
+- Slice view: the ends are the object's own `w` extent `[w_min, w_max]`
+  (`wRange`), each side scaled by its own extent so that `w = 0` stays at the
+  midpoint and both extremes of the object reach the gradient ends (for the
+  5-cell, `w ∈ [-1/√5, 4/√5]`).
+- Projection view: the ends are `±R`, where `R` is the radius of an
+  origin-centred ball containing the object (`radius`). After any rotation
+  `|w| ≤ |p| ≤ R`, so `±R` is the extent `w` can reach under rotation, and the
+  colours do not rescale as the object turns; a vertex reaches a gradient end
+  exactly when it is rotated onto `±R e_w`.
+
+The two scales differ: for the tesseract `R = 2` while its own `w` extent is
+`[-1, 1]`, so at zero rotation its vertices sit at `t = 1/4` and `3/4` in the
+projection view but at the ends in the slice view, and in the overlay the
+same material is coloured differently by the two layers. The legend
+therefore shows one row per view with its own end values.
