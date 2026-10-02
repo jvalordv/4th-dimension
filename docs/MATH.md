@@ -188,7 +188,10 @@ For each tet, compute `s_k = n · p_k - c` for its four vertices. Classify each
 vertex as *positive* if `s_k ≥ 0`, otherwise *negative*. Treating zero as
 positive is a symbolic perturbation: every vertex falls in exactly one class,
 so the output is watertight even when vertices lie exactly on `H`; the price
-is occasional zero-area triangles, which are harmless.
+is occasional zero-area triangles, which are harmless. The convention is
+equivalent to slicing at `c - ε`, so the output at an offset where a whole
+cell lies in `H` is the limit from below: for the tesseract `[-1, 1]^4`, the
+slice at `w = +1` is the cube and the slice at `w = -1` is empty.
 
 An edge `(p, q)` crosses `H` iff its endpoints are in different classes. The
 crossing point is `p + t (q - p)` with `t = s_p / (s_p - s_q)`, `t ∈ [0, 1]`.
