@@ -1,0 +1,73 @@
+/*
+ * Explainer content styles. The container is the panel body from
+ * src/style.css (which sets the base type, h2/h3/p/code/ul rules and the
+ * dark palette tokens); this file only styles what the explainer itself
+ * emits: the tier block, the closing "best view" note, the missing-topic
+ * notice and inline emphasis. Token fallbacks match src/style.css.
+ */
+
+.explainer-content {
+  --ex-muted: var(--muted, #98a2b8);
+  --ex-accent: var(--accent, #7fb2ff);
+  --ex-border: var(--panel-border, rgba(255, 255, 255, 0.08));
+}
+
+.explainer-content .explainer-title {
+  margin: 0 0 10px;
+  font-size: 18px;
+  font-weight: 650;
+  line-height: 1.25;
+}
+
+.explainer-content .explainer-tier p:last-child {
+  margin-bottom: 0;
+}
+
+.explainer-content .explainer-tier strong {
+  font-weight: 650;
+  color: #fff;
+}
+
+.explainer-content .explainer-tier em {
+  font-style: italic;
+  color: var(--ex-accent);
+}
+
+.explainer-content .explainer-tier ul {
+  padding-left: 20px;
+  margin: 0 0 10px;
+}
+
+.explainer-content .explainer-tier li {
+  margin: 0 0 4px;
+}
+
+/* Plain-words tier: slightly larger, airier reading text. */
+.explainer-content .explainer-tier-eli5 p {
+  font-size: 14.5px;
+  line-height: 1.55;
+}
+
+/* Math tier: keep formulas from wrapping awkwardly. */
+.explainer-content .explainer-tier-math code {
+  white-space: nowrap;
+}
+
+/* One-line "which view shows this best" note closing each shape topic. */
+.explainer-content .explainer-view-note {
+  margin: 14px 0 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--ex-border);
+  font-size: 12.5px;
+  color: var(--ex-muted);
+}
+
+.explainer-content .explainer-view-note strong {
+  color: var(--ex-accent);
+  text-transform: capitalize;
+}
+
+.explainer-content .explainer-missing {
+  color: var(--ex-muted);
+  font-style: italic;
+}

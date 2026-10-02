@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <title>4th-dimension</title>
+  </head>
+  <body>
+    <div id="app">
+      <div id="viewport"></div>
+
+      <div id="gui"></div>
+
+      <div id="title" class="overlay"></div>
+
+      <div id="status" class="overlay mono"></div>
+
+      <div id="legend" class="overlay"></div>
+
+      <aside id="explainer">
+        <header class="explainer-header">
+          <span class="explainer-heading">Explainer</span>
+          <div id="tiers" class="tiers"></div>
+        </header>
+        <div id="explainer-body" class="explainer-body"></div>
+      </aside>
+
+      <div id="help" class="help hidden">
+        <div class="help-card">
+          <h2>How to look at a 4D object</h2>
+          <p>
+            Every point has four coordinates <span class="mono">(x, y, z, w)</span>. The viewer rotates the
+            object in 4D and shows it in 3D in two honest ways: <strong>projection</strong> (drop a dimension,
+            the way a photograph does) and <strong>slice</strong> (the part of the object inside our space
+            <span class="mono">w = c</span>). <strong>Overlay</strong> shows both. Colour is the invisible
+            <span class="mono">w</span>: cool is negative, warm is positive.
+          </p>
+          <table>
+            <tr><th>drag</th><td>orbit the 3D camera</td></tr>
+            <tr><th>scroll</th><td>zoom</td></tr>
+            <tr><th>right drag</th><td>pan</td></tr>
+            <tr><th class="mono">space</th><td>play / pause the animation</td></tr>
+            <tr><th class="mono">1 2 3</th><td>projection / slice / overlay</td></tr>
+            <tr><th class="mono">R</th><td>reset angles and slice offset</td></tr>
+            <tr><th class="mono">?</th><td>toggle this help</td></tr>
+            <tr><th class="mono">Esc</th><td>close this help</td></tr>
+          </table>
+          <p class="help-foot">
+            Rotation happens in six planes. <span class="mono">XY XZ YZ</span> are ordinary 3D rotations;
+            <span class="mono">XW YW ZW</span> turn the object partly out of our space.
+          </p>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
