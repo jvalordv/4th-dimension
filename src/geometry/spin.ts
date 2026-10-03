@@ -14,16 +14,43 @@
  * ∈ S, so the figure passes through our space as a pair of mirror twins that
  * approach each other and vanish once |c| exceeds its greatest height.
  */
-import type { Edge, Hyperplane, Shape4, Tet, TetComplex, TriMesh3, Vec4, WireMesh4 } from '../math/types';
+import type { Edge, Hyperplane, Shape4, Tet, TetComplex, TriMesh3, Vec3, Vec4, WireMesh4 } from '../math/types';
 import { cross3 } from '../math/vec';
 import type { Mesh3, Triangle } from './mesh3';
 import { mesh3Bounds, mesh3Edges } from './mesh3';
-import { CLIP_SNAP, clipMesh3 } from './clip';
+import { clipMesh3 } from './clip';
 import { sliceTets } from './slice';
 import { signedHypervolume, tetNormal } from './tets';
 
-/** A vertex with z ≤ PLANE_TOL · radius is taken to lie in z = 0 (§9.2: it maps to the single point (x, y, 0, 0)). */
-const PLANE_TOL = 1e-12;
+/**
+ * A vertex with |z| ≤ SPIN_SNAP · N · radius (radius: the farthest vertex from
+ * the origin, N: the number of steps) is moved onto the plane z = 0 before
+ * anything else happens, so that it maps to the single point (x, y, 0, 0)
+ * (§9.2) and counts as lying in the plane whichever side it was on.
+ *
+ * Why not just "rounding noise": a vertex at height z that is genuinely off
+ * the plane makes spun tets of volume ≈ z · (2π/N) · O(radius²) (the chord of
+ * its circle times the extent of the mesh), and §5.2 calls a tet degenerate
+ * once 6 · volume ≤ 1e-9 · radius³. Below the plane the clip would cut a
+ * needle of that thickness; above it the spin would make a ring that thin;
+ * either way the boundary is closed and Pappus still holds, but the complex
+ * is not valid at the default tolerance for z up to ≈ 3e-9 · radius · N/(2π)
+ * (measured: 5e-9 at N = 8, 2e-8 at N = 48, 1.5e-7 at N = 360). The band is
+ * about thirty times that, and tiny against any feature of a real mesh
+ * (≈ 5e-7 of the radius at the default N = 48). clipMesh3's own snap band
+ * (CLIP_SNAP, 1e-9 of the extent) is far narrower and no longer decides
+ * anything here.
+ */
+export const SPIN_SNAP = 1e-8;
+
+/** `mesh` with every vertex of |z| ≤ band put exactly on z = 0; the mesh itself when there is none to move. */
+function snapToPlane(mesh: Mesh3, band: number): Mesh3 {
+  if (!mesh.positions.some((p) => p[2] !== 0 && Math.abs(p[2]) <= band)) return mesh;
+  return {
+    positions: mesh.positions.map((p): Vec3 => (Math.abs(p[2]) <= band ? [p[0], p[1], 0] : p)),
+    triangles: mesh.triangles,
+  };
+}
 
 /**
  * ∫_S z dV for the solid bounded by `mesh`, the first moment about the plane
@@ -105,8 +132,8 @@ const distinct = (t: Tet): boolean => t[0] !== t[1] && t[0] !== t[2] && t[0] !==
  * projection view.
  *
  * Vertices: a mesh vertex with z > 0 has one copy per step k,
- * (x, y, z cos φ_k, z sin φ_k); a vertex with z = 0 (within 1e-12 of the
- * radius) has the single copy (x, y, 0, 0). Triangles with all three vertices
+ * (x, y, z cos φ_k, z sin φ_k); a vertex with z = 0 (after the snap of
+ * SPIN_SNAP) has the single copy (x, y, 0, 0). Triangles with all three vertices
  * in z = 0 (F in §9.2) are not part of the boundary and are dropped; every
  * other triangle and every step gives one prism, three tets, of which those
  * with a repeated vertex (the prism collapsed onto a pyramid or tet by its
@@ -123,16 +150,21 @@ const distinct = (t: Tet): boolean => t[0] !== t[1] && t[0] !== t[2] && t[0] !==
 export class SpunSolid implements Shape4 {
   readonly kind = 'lifted' as const;
   readonly complex: TetComplex;
-  /** The mesh that was spun: the input, or its clip to z ≥ 0 when it dipped below z = 0 (§9.4). */
+  /**
+   * The mesh that was spun, exactly: the input, or its clip to z ≥ 0 when it
+   * dipped below z = 0 (§9.4), in either case with the vertices within the
+   * snap band (SPIN_SNAP) moved onto z = 0. The input object itself when
+   * nothing needed moving.
+   */
   readonly mesh: Mesh3;
-  /** Whether the input had vertices below z = 0 and was clipped first (§9.2, §9.4); the viewer says so. */
+  /** Whether the input had vertices below the plane beyond the snap band and was clipped first (§9.2, §9.4); the viewer says so. */
   readonly clipped: boolean;
   readonly steps: number;
   private readonly boundary: Triangle[];
   private readonly base: Int32Array;
   private readonly flat: Uint8Array;
   private readonly r: number;
-  private readonly zMax: number;
+  private readonly wMax: number;
   private wireCache: WireMesh4 | null = null;
 
   /**
@@ -144,17 +176,17 @@ export class SpunSolid implements Shape4 {
   constructor(public readonly name: string, source: Mesh3, steps = 48) {
     if (!Number.isInteger(steps) || steps < 3) throw new Error(`spin: steps must be an integer ≥ 3, got ${steps}`);
     this.steps = steps;
-    const sourceRadius = mesh3Bounds(source).radius;
-    // Below z = −1e-9·radius is geometry; above it is rounding noise.
-    this.clipped = source.positions.some((p) => p[2] < -CLIP_SNAP * sourceRadius);
-    this.mesh = this.clipped ? clipMesh3(source, [0, 0, 1], 0) : source;
-    const mesh = this.mesh;
-    // After a clip, vertices the clip snapped onto the plane (within CLIP_SNAP) are in z = 0.
-    const planeTol = (this.clipped ? CLIP_SNAP : PLANE_TOL) * sourceRadius;
+    // Vertices this close to z = 0 are on it (SPIN_SNAP); what is still below it is geometry.
+    const band = SPIN_SNAP * steps * mesh3Bounds(source).radius;
+    const snapped = snapToPlane(source, band);
+    this.clipped = snapped.positions.some((p) => p[2] < 0);
+    // The clip creates its cut points on the plane to rounding only (≈ 1e-17): put them exactly in it.
+    const mesh = this.clipped ? snapToPlane(clipMesh3(snapped, [0, 0, 1], 0), band) : snapped;
+    this.mesh = mesh;
 
     const nv = mesh.positions.length;
     this.flat = new Uint8Array(nv);
-    for (let i = 0; i < nv; i++) this.flat[i] = mesh.positions[i][2] <= planeTol ? 1 : 0;
+    for (let i = 0; i < nv; i++) this.flat[i] = mesh.positions[i][2] <= band ? 1 : 0;
     this.boundary = mesh.triangles.filter(([a, b, c]) => !(this.flat[a] && this.flat[b] && this.flat[c]));
     if (this.boundary.length === 0) {
       throw new Error(`spin: nothing to spin for '${name}' (the solid lies in z ≤ 0 or has no triangle above z = 0)`);
@@ -182,7 +214,8 @@ export class SpunSolid implements Shape4 {
         for (let k = 0; k < N; k++) positions.push([x, y, z * angles[k][0], z * angles[k][1]]);
       }
     }
-    this.zMax = zMax;
+    // Largest |w| of a vertex: z_max · max_k |sin φ_k|, which is z_max exactly when 4 | N.
+    this.wMax = zMax * angles.reduce((m, [, sin]) => Math.max(m, Math.abs(sin)), 0);
     this.r = Math.sqrt(r2);
 
     const id = (v: number, k: number): number => (this.flat[v] ? this.base[v] : this.base[v] + (k % N));
@@ -265,9 +298,15 @@ export class SpunSolid implements Shape4 {
     return this.r;
   }
 
-  /** [−z_max, z_max], the w extent of the full circle of radius z_max (exact for N divisible by 4). */
+  /**
+   * The w extent of the complex (§10 uses it as the ends of the colour
+   * gradient): ±z_max · max_k |sin φ_k|. The steps are at multiples of 2π/N,
+   * so w = z_max is reached only when 4 | N (the default 48 and 36); for
+   * N = 6 it is z_max sin 60°. The steps are symmetric under k ↔ N − k, so
+   * the range is symmetric.
+   */
   wRange(): [number, number] {
-    return [-this.zMax, this.zMax];
+    return [-this.wMax, this.wMax];
   }
 }
 

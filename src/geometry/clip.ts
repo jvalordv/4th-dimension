@@ -26,8 +26,10 @@ import { planarSectionFromDistances, triangulateSection } from './section';
  * this a plane passing within rounding of a vertex (z = 1e-17 after a
  * rotation, say) would cut the edges at that vertex into clusters of points
  * 1e-17 apart, which no triangulation can orient reliably. 1e-9 is far above
- * Float64 rounding (≈ 1e-16) and far below any feature of a real mesh, and it
- * is the same threshold spin.ts uses to decide that a vertex is below z = 0.
+ * Float64 rounding (≈ 1e-16) and far below any feature of a real mesh. The
+ * spin lifting (spin.ts) snaps a wider band onto z = 0 itself before it calls
+ * clipMesh3, so that no cut thinner than the §5.2 degeneracy tolerance is
+ * ever spun; clipMesh3 on its own keeps this narrow band.
  */
 export const CLIP_SNAP = 1e-9;
 

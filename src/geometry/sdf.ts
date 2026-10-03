@@ -116,9 +116,8 @@ export function duocylinder(r1: number, r2: number): Sdf4 {
  * Spheritorus: √((√(x²+y²+z²) − R)² + w²) − r, the set within r of the
  * 2-sphere of radius R in the hyperplane w = 0 (S² × D², boundary S² × S¹).
  * Its w = 0 slice is the thick spherical shell R − r ≤ |q| ≤ R + r. Needs
- * r < R. 4-volume 4π² R² r² + π² r⁴ (derived in test/geometry/sdf.test.ts;
- * the table of MATH.md §9.3 prints the torisphere's value, 2πR·(4/3)π r³,
- * which belongs to the set within r of a *circle*, not of a sphere).
+ * r < R. 4-volume 4π² R² r² + π² r⁴ (MATH.md §9.3: integrate the shell
+ * slices 8πR²a + (8π/3)a³, a = √(r² − c²), over c).
  */
 export function spheritorus(R: number, r: number): Sdf4 {
   assertPositive('spheritorus R', R);

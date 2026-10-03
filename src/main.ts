@@ -12,6 +12,7 @@
 import './style.css';
 import './app/shapes';
 import { mountExplainer } from './explain';
+import type { ExplainerPanel } from './explain';
 import { advanceAnimation } from './app/animation';
 import { StateStore } from './app/state';
 import { mountUI, shapeTopic } from './app/ui';
@@ -36,10 +37,28 @@ const viewer = new Viewer(must('viewport'));
 const panel = mountExplainer(must('explainer-body'));
 
 // Flatland mounts hidden; its keys are routed through the 4D UI's hook below.
-const flatland = mountFlatland(must('flatland'), panel);
+// The host div is absolutely positioned over the whole page below the mode bar
+// and the app only hides its inner wrapper, so the host itself is taken out of
+// the layout while 4D is active (setMode); left in place it would sit over the
+// 4D canvas and swallow every pointer and wheel event (orbit, zoom, pan).
+const flatlandHost = must('flatland');
+flatlandHost.style.display = 'none';
+const flatland = mountFlatland(flatlandHost, panel);
 let mode: Mode = '4d';
 
-const ui = mountUI(store, panel, {
+// The explainer follows the active mode. The 4D UI shows topics from async
+// callbacks too (an import finishing after the switch to Flatland publishes
+// the 'import' topic), so while Flatland is active its topic requests are
+// dropped; setMode re-shows the 4D shape's topic on the way back.
+const uiPanel: ExplainerPanel = {
+  show: (id) => {
+    if (mode === '4d') panel.show(id);
+  },
+  setTier: (tier) => panel.setTier(tier),
+  getTier: () => panel.getTier(),
+};
+
+const ui = mountUI(store, uiPanel, {
   gui: must('gui'),
   title: must('title'),
   legend: must('legend'),
@@ -48,7 +67,9 @@ const ui = mountUI(store, panel, {
   help: must('help'),
   importPanel: must('import'),
 }, {
-  interceptKey: (ev) => mode === 'flat' && flatland.handleKey(ev),
+  // In Flatland the keys of the mode are handled by it, and the 4D help ('?'
+  // and Esc toggle an overlay that describes the 4D viewer) is swallowed.
+  interceptKey: (ev) => mode === 'flat' && (flatland.handleKey(ev) || ev.key === '?' || ev.key === 'Escape'),
 });
 
 // ---- WebXR ------------------------------------------------------------------
@@ -58,6 +79,9 @@ const ui = mountUI(store, panel, {
 const xr = setupXR(viewer.renderer, viewer.scene, viewer.world, {
   getRadius: () => (store.state.viewMode === 'slice' ? store.radius : projectedExtent(store.radius, store.state.projection)),
   onSelect: () => store.togglePlaying(),
+  // In the headset the explainer cannot be read, but it is right on return.
+  onSessionStart: () => panel.show('xr'),
+  onSessionEnd: () => panel.show(store.state.shapeId),
 });
 if (xr.button) {
   // VRButton positions itself absolutely at the bottom of its parent and the
@@ -99,9 +123,11 @@ function setMode(next: Mode): void {
     ui.toggleImport(false);
     // An immersive session drives the renderer's loop, so it is left running.
     if (!viewer.renderer.xr.isPresenting) viewer.stop();
+    flatlandHost.style.display = '';
     flatland.show();
   } else {
     flatland.hide();
+    flatlandHost.style.display = 'none';
     viewer.start(frame);
     panel.show(shapeTopic(store.state.shapeId));
   }

@@ -47,6 +47,8 @@ const now = (): number => (typeof performance !== 'undefined' ? performance.now(
 
 /** Slice rebuild cost (ms) above which rebuilds are spaced out while animating. */
 const SLICE_PACE_MS = 12;
+/** Wire renderables kept alive; the catalogue has 24 shapes, imports come and go. */
+const MAX_CACHED_WIRES = 32;
 
 export class Viewer {
   readonly renderer: WebGLRenderer;
@@ -147,9 +149,21 @@ export class Viewer {
     const wireMesh = shape.wire();
     if (wireMesh) {
       let w = this.wires.get(shape);
-      if (!w) {
+      if (w) {
+        // Refresh recency.
+        this.wires.delete(shape);
+      } else {
         w = new WireRenderable(wireMesh);
-        this.wires.set(shape, w);
+      }
+      this.wires.set(shape, w);
+      // Least recently used wires beyond the cap are disposed, so shapes that
+      // are replaced (re-imported models) do not keep GPU buffers forever.
+      while (this.wires.size > MAX_CACHED_WIRES) {
+        const [oldest, renderable] = this.wires.entries().next().value as [Shape4, WireRenderable];
+        this.wires.delete(oldest);
+        this.scene.remove(renderable.group);
+        this.world.remove(renderable.group);
+        renderable.dispose();
       }
       this.wire = w;
       this.world.add(w.group);

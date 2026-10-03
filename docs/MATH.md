@@ -239,7 +239,11 @@ zero-volume slice unless a whole cell lies in `H`:
   cleaned output is empty (the 4-ball of §8.5 at `c = R`).
 - `H` contains a 2-face `F`: `F` is emitted *twice*, once by each tet adjacent
   to it, with opposite orientations and nonzero area. The cleaned output is a
-  doubled flat polygon with every interior edge in four triangles, volume 0,
+  doubled flat polygon, volume 0, in which an interior edge lies in four
+  triangles when both sheets share a diagonal (as the cone tets do) and in
+  two otherwise (an extruded solid's cap is triangulated independently of
+  its lateral tets, so its doubled polygon can even pass an edge-count
+  closedness test); zero volume is the reliable signature,
   and it is *not* closed in the sense above. Examples: the tesseract with
   `n = (0,0,1,1)/√2, c = √2` (the square `z = w = 1`), and the discretised
   duocylinder of §8.6 at `w = r_2` when its polygon `P_2` has a vertex at
@@ -415,7 +419,11 @@ round a circle, the *torisphere* of section 9.3 (`S^1 × B^3`, boundary
 a solid ring with square cross-section.
 
 A solid that crosses `z = 0` is first clipped to `z ≥ 0` (section 9.4), so
-that the spun solid is well defined; the viewer says so.
+that the spun solid is well defined; the viewer says so. Before deciding,
+vertices with `|z| ≤ 10^{-8} N R` (`N` steps, `R` the bounding radius) are
+snapped onto the plane: a sliver thinner than that would spin into tets
+below the degeneracy tolerance of section 5.2, and a solid that merely
+grazes the plane should not count as clipped.
 
 Boundary. Let `M` be `S`'s boundary mesh and `F ⊂ M` the part lying in the
 plane `z = 0`. Points of `F` are fixed by the spin and land in the interior
@@ -616,7 +624,8 @@ mesh plays the role of the tet complex; Flatland is the plane `z = 0`.
 
 ## 12. Imported 3D models
 
-A model arrives as triangles (OBJ or glTF/GLB). It is welded by position,
+A model arrives as triangles (OBJ or glTF/GLB). It is welded by position
+(vertices within `10^{-6}` of the bounding radius merge),
 re-centred at its bounding-box centre and scaled so its bounding radius is 1,
 then validated: every edge must belong to exactly two triangles with
 opposite directions (section 9.1's requirement). A closed model may be lifted

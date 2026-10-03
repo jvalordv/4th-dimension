@@ -4,7 +4,7 @@ import {
 } from '../../src/geometry/mesh3';
 import type { Mesh3 } from '../../src/geometry/mesh3';
 import { clipMesh3 } from '../../src/geometry/clip';
-import { firstMomentZ, spin, SpunSolid } from '../../src/geometry/spin';
+import { firstMomentZ, SPIN_SNAP, spin, SpunSolid } from '../../src/geometry/spin';
 import {
   humanParts, human, spunBall, spunCube, spunHalfBall, spunHuman, SPUN_SHAPES,
 } from '../../src/geometry/figures';
@@ -211,7 +211,7 @@ describe('validity and Pappus for spun balls, cubes, half-balls and meshes touch
   });
 
   it('a mesh whose bottom is within rounding of z = 0 is not clipped and is treated as lying in it', () => {
-    // bottom face at z = −1e-13 (≪ 1e-9 of the radius): noise, not geometry.
+    // bottom face at z = −1e-13 (≪ SPIN_SNAP · N · radius): noise, not geometry.
     const noisy = translateMesh3(box(1, 1, 1), [0, 0, 0.5 - 1e-13]);
     const s = spin(noisy, 48, 'noisy');
     expect(s.clipped).toBe(false);
@@ -221,6 +221,45 @@ describe('validity and Pappus for spun balls, cubes, half-balls and meshes touch
     expect(s.complex.tets.length).toBe(18 * 48);
     // The 4 plane vertices are the single points (x, y, 0, 0); an off-plane copy has z or w nonzero.
     expect(s.complex.positions.filter((p) => p[2] === 0 && p[3] === 0).length).toBe(4);
+  });
+
+  it('vertices within SPIN_SNAP · N · radius of z = 0, on either side, are moved onto it (the spun mesh is the snapped mesh), so no sliver is spun', () => {
+    const N = 48;
+    const radius = Math.hypot(0.5, 0.5, 0.5);
+    const band = SPIN_SNAP * N * radius;
+    for (const sign of [-1, 1]) {
+      const near = translateMesh3(box(1, 1, 1), [0, 0, 0.5 + sign * 0.5 * band]);
+      const s = spin(near, N, 'near');
+      expect(s.clipped).toBe(false);
+      expect(s.mesh).not.toBe(near);
+      expect(s.mesh.positions.filter((p) => p[2] === 0).length).toBe(4); // exactly on the plane
+      expect(s.complex.tets.length).toBe(18 * N); // as the exact resting box
+      expect(validateTetComplex(s.complex.positions, s.complex.tets).ok).toBe(true);
+      expect(relErr(s.hypervolume(), discretePappus(s.mesh, N))).toBeLessThan(1e-12);
+    }
+    // 1.5 bands below: geometry. The mesh is clipped and the clip is a valid complex too.
+    const dip = spin(translateMesh3(box(1, 1, 1), [0, 0, 0.5 - 1.5 * band]), N, 'dip');
+    expect(dip.clipped).toBe(true);
+    expect(validateTetComplex(dip.complex.positions, dip.complex.tets).ok).toBe(true);
+    // The input is not modified, and a mesh with nothing to snap is spun as is.
+    const exact = translateMesh3(box(1, 1, 1), [0, 0, 0.5]);
+    const copy = JSON.stringify(exact);
+    expect(spin(exact, N, 'exact').mesh).toBe(exact);
+    expect(JSON.stringify(exact)).toBe(copy);
+  });
+});
+
+describe('wRange (MATH.md §10: the ends of the slice colour gradient)', () => {
+  it('is the w extent of the complex: z_max when 4 | N, z_max · max sin φ_k otherwise (N = 6: z_max sin 60°)', () => {
+    const cube = translateMesh3(box(1, 1, 1), [0, 0, 1.2]); // z_max = 1.7
+    for (const N of [3, 5, 6, 7, 8, 12, 48]) {
+      const s = spin(cube, N, 'cube');
+      const ws = s.complex.positions.map((p) => p[3]);
+      expect(s.wRange()[1]).toBeCloseTo(Math.max(...ws), 13);
+      expect(s.wRange()[0]).toBeCloseTo(Math.min(...ws), 13);
+    }
+    expect(spin(cube, 6, 'N6').wRange()[1]).toBeCloseTo(1.7 * Math.sin(Math.PI / 3), 13);
+    expect(spin(cube, 8, 'N8').wRange()).toEqual([-1.7, 1.7]);
   });
 });
 

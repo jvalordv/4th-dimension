@@ -378,7 +378,7 @@ describe('explainers for spin, signed distance fields, imports, XR and Flatland'
     expect(shell).toBeCloseTo(exact, 9);
     // Independent route: ∫∫ 4π s² ds dw over the disc (s − R)² + w² ≤ r² (§9.3 text, Pappus-type argument).
     expect(overDisc(r, (u) => 4 * Math.PI * (R + u) ** 2)).toBeCloseTo(exact, 9);
-    // The table of §9.3 prints 2πR · (4/3)π r³ on this row; that is the torisphere's value and differs here.
+    // The §9.3 table prints 4π²R²r² + π²r⁴ for the spheritorus; 2πR · (4/3)π r³ is the torisphere's value and differs here.
     const swept = 2 * Math.PI * R * (4 / 3) * Math.PI * r ** 3;
     expect(exact / swept).toBeGreaterThan(3);
     expect(text(SHAPE_IDS.sdfSpheritorus, 'math')).toContain('4π² R² r² + π² r⁴');
@@ -386,6 +386,9 @@ describe('explainers for spin, signed distance fields, imports, XR and Flatland'
     expect(text(SHAPE_IDS.sdfSpheritorus, 'math')).not.toContain('2πR · (4/3)π r³</code>, the 4-volume');
     expect(text(SHAPE_IDS.sdfSpheritorus, 'intermediate')).toMatch(/Not to be confused with the Torisphere/);
     expect(text('sdf', 'math')).toContain('4π² R² r² + π² r⁴');
+    // No stale note (even inside an HTML comment) claims that the table prints the torisphere's value on the spheritorus row.
+    expect(text('sdf', 'math')).not.toMatch(/prints 2πR · \(4\/3\)π r³ on this row/);
+    expect(text('sdf', 'math')).toMatch(/2πR · \(4\/3\)π r³ is the torisphere's/);
   });
 
   it('torisphere (tube around a circle): slice solid torus and the volume 2πR · (4/3)π r³', () => {
@@ -623,6 +626,98 @@ describe('explainers for spin, signed distance fields, imports, XR and Flatland'
     expect(text('xr', 'intermediate')).toMatch(/isometry/);
     expect(text('xr', 'intermediate')).toContain('det(u_1, u_2, u_3, n) = +1');
     expect(text('xr', 'math')).toMatch(/orientation/);
+  });
+
+  it('spin orientation (§9.2): the outward normal of a lateral tet is the n_z/cos(π/N) vector, not the spun normal', () => {
+    // Prism of step k over a triangle (a, b, c) in z > 0: the six points (p_x, p_y, p_z cos φ, p_z sin φ) at φ_k, φ_{k+1}.
+    const N = 7;
+    const k = 2;
+    const phi = (j: number): number => (2 * Math.PI * j) / N;
+    const mid = (phi(k) + phi(k + 1)) / 2;
+    const tri: Vec3[] = [[0.3, -0.2, 1.1], [-0.5, 0.4, 1.6], [0.1, 0.7, 0.9]];
+    const sub = (u: Vec3, v: Vec3): Vec3 => [u[0] - v[0], u[1] - v[1], u[2] - v[2]];
+    const e1 = sub(tri[1], tri[0]);
+    const e2 = sub(tri[2], tri[0]);
+    const nn: Vec3 = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]];
+    const len = Math.hypot(...nn);
+    const n = nn.map((x) => x / len) as Vec3;
+    const lift = (q: Vec3, j: number): Vec4 => [q[0], q[1], q[2] * Math.cos(phi(j)), q[2] * Math.sin(phi(j))];
+    const prism: Vec4[] = [...tri.map((q) => lift(q, k)), ...tri.map((q) => lift(q, k + 1))];
+    const dot4 = (u: ArrayLike<number>, v: ArrayLike<number>): number => u[0] * v[0] + u[1] * v[1] + u[2] * v[2] + u[3] * v[3];
+    const spread = (nrm: Vec4): number => {
+      const h = prism.map((v) => dot4(nrm, v));
+      return Math.max(...h) - Math.min(...h);
+    };
+    // §9.2's vector is constant on all six vertices, i.e. it is the normal of the hyperplane carrying the lateral tets.
+    const cosHalf = Math.cos(Math.PI / N);
+    const outward: Vec4 = [n[0], n[1], (n[2] / cosHalf) * Math.cos(mid), (n[2] / cosHalf) * Math.sin(mid)];
+    expect(spread(outward)).toBeLessThan(1e-12);
+    // Its dot product with the spun normal at φ_mid is n_x² + n_y² + n_z²/cos(π/N) > 0, so the sign test is exact.
+    const spun: Vec4 = [n[0], n[1], n[2] * Math.cos(mid), n[2] * Math.sin(mid)];
+    expect(dot4(outward, spun)).toBeCloseTo(n[0] ** 2 + n[1] ** 2 + n[2] ** 2 / cosHalf, 12);
+    expect(dot4(outward, spun)).toBeGreaterThan(0);
+    // The spun normal itself is constant on the prism for no φ in the step: it is not the normal of the tets.
+    for (let i = 0; i <= 20; i++) {
+      const ph = phi(k) + ((phi(k + 1) - phi(k)) * i) / 20;
+      expect(spread([n[0], n[1], n[2] * Math.cos(ph), n[2] * Math.sin(ph)])).toBeGreaterThan(1e-3);
+    }
+    // The explainer says the first, and no longer claims the second.
+    const m = text('lift:spin', 'math');
+    expect(m).toContain('(n_z / cos(π/N)) cos φ_mid');
+    expect(m).toContain('n_x² + n_y² + n_z² / cos(π/N) &gt; 0');
+    expect(m).not.toContain('is the spun triangle normal');
+    expect(m).not.toContain('for a <code>φ</code> inside the step');
+  });
+
+  it('tiger twins thicken while they close in (§9.3): b − a = 4R₂r/(a + b) ≥ 2r, so the text must not say squash', () => {
+    const R2 = 0.7;
+    const r = 0.25;
+    let previousWidth = 2 * r;
+    let previousA = R2 - r;
+    for (const c of [0, 0.1, 0.2, 0.3, 0.4]) {
+      const a = Math.sqrt((R2 - r) ** 2 - c * c);
+      const b = Math.sqrt((R2 + r) ** 2 - c * c);
+      expect(b - a).toBeCloseTo((4 * R2 * r) / (a + b), 12);
+      if (c === 0) expect(b - a).toBeCloseTo(2 * r, 12);
+      else {
+        expect(b - a).toBeGreaterThan(previousWidth); // thicker along z as |c| grows
+        expect(a).toBeLessThan(previousA); // and nearer the middle plane
+      }
+      previousWidth = b - a;
+      previousA = a;
+    }
+    expect(text(SHAPE_IDS.sdfTiger, 'eli5')).not.toMatch(/squash/);
+    expect(text(SHAPE_IDS.sdfTiger, 'eli5')).toMatch(/thicken and slide toward each other/);
+    expect(text(SHAPE_IDS.sdfTiger, 'intermediate')).toMatch(/stretched along <code>z<\/code>/);
+  });
+
+  it('XR places whatever is drawn, and only offers VR (§12: the drawn slice or projection, rigid motion and uniform scale)', () => {
+    const eli5 = text('xr', 'eli5');
+    expect(eli5).toMatch(/VR headset/);
+    expect(eli5).not.toMatch(/\bAR\b/);
+    expect(eli5).toMatch(/slice, or the shadow, in the room around you as a real object/);
+    const mid = text('xr', 'intermediate');
+    expect(mid).toMatch(/whatever the viewer is drawing, the slice or the projection/);
+    expect(mid).toMatch(/rigid motion and one uniform scale/);
+    expect(text('xr', 'math')).toMatch(/rigid motion and a uniform scale \(§12\)/);
+    expect(text('intro', 'intermediate')).toMatch(/XR places what is drawn, the slice or the projection/);
+  });
+
+  it('Flatland cylinder: a gentle tilt gives a whole ellipse, only a steeper one reaches the flat ends (§9.1, §11)', () => {
+    // Cylinder of radius r and half-height h cut by the plane z = x tan θ through the centre: the plane meets the
+    // end z = h at x = h / tan θ, which lies on the disc iff tan θ ≥ h / r.
+    const r = 1;
+    const h = 1;
+    const reachesEnds = (theta: number): boolean => r * Math.tan(theta) > h;
+    expect(reachesEnds((20 * Math.PI) / 180)).toBe(false);
+    expect(reachesEnds((44 * Math.PI) / 180)).toBe(false);
+    expect(reachesEnds((46 * Math.PI) / 180)).toBe(true);
+    expect(reachesEnds((70 * Math.PI) / 180)).toBe(true);
+    const eli5 = text('flat:cylinder', 'eli5');
+    expect(eli5).not.toMatch(/Tilt it and the slice becomes an oval with two straight cuts/);
+    expect(eli5).toMatch(/Tilt it a little and the slice becomes an oval/);
+    expect(eli5).toMatch(/tilt it enough for the sheet to reach the flat ends of the can and the oval is cut off by two straight edges/);
+    expect(text('flat:cylinder', 'intermediate')).toMatch(/sheared slab/);
   });
 });
 

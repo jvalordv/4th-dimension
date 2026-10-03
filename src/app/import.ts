@@ -16,6 +16,7 @@ import { extrude } from '../geometry/extrude';
 import { spin } from '../geometry/spin';
 import { boundingSphere, fromBufferGeometry, parseObj, WELD_TOLERANCE } from './obj';
 import { IMPORT_ID_PREFIX, registerShape, unregisterShape } from './registry';
+import type { Shape4 } from '../math/types';
 import type { ShapeEntry } from './registry';
 
 /** Half-height of the prism an imported model is extruded into (so the prism spans w ∈ [−1/2, 1/2]). MATH.md §9.1 */
@@ -260,11 +261,16 @@ export function slugify(name: string): string {
 }
 
 /** Whether the report describes a closed, consistently oriented surface: a solid that caps and spin make sense for (§9, §12). */
-export const isSolid = (report: ImportReport): boolean => report.closed && report.consistent;
+/** A closed model thinner than this (normalised to radius 1) has no interior to lift or spin. */
+export const MIN_SOLID_VOLUME = 1e-9;
+
+export const isSolid = (report: ImportReport): boolean =>
+  report.closed && report.consistent && report.volume > MIN_SOLID_VOLUME;
 
 /** The part of a shape description that says whether the model is closed (MATH.md §12). */
 export function closednessText(report: ImportReport): string {
   if (isSolid(report)) return 'closed';
+  if (report.closed && report.consistent) return 'closed but flat (zero volume; nothing to slice)';
   if (report.boundaryEdges > 0) return `open (${report.boundaryEdges} boundary edges; slices are open surfaces)`;
   if (!report.closed) return 'not a valid solid (edges shared by more than two triangles; slices may be open surfaces)';
   return 'not a valid solid (inconsistently oriented triangles; slices may be open surfaces)';
@@ -289,8 +295,12 @@ export function registerImportedShape(name: string, mesh: Mesh3, lifting: Liftin
   if (lifting === 'spin' && !solid) {
     throw new Error(`Spin needs a closed model, but '${name}' is ${closednessText(report)}; extrude it instead`);
   }
-  const id = `${IMPORT_ID_PREFIX}${slugify(name)}-${lifting}`;
-  unregisterShape(id);
+  const base = `${IMPORT_ID_PREFIX}${slugify(name)}`;
+  const id = `${base}-${lifting}`;
+  let built: Shape4 | null = null;
+  const build = (): Shape4 => (lifting === 'extrude'
+    ? extrude(mesh, IMPORT_EXTRUDE_HALF_HEIGHT, name, { caps: solid })
+    : spin(mesh, IMPORT_SPIN_STEPS, name));
   const entry: ShapeEntry = {
     id,
     label: `${name} (${lifting === 'extrude' ? 'extruded' : 'spun'})`,
@@ -298,10 +308,21 @@ export function registerImportedShape(name: string, mesh: Mesh3, lifting: Liftin
     description: `Imported model ${lifting === 'extrude'
       ? 'extruded along w into a prism (§9.1)'
       : 'spun about the plane z = 0 (§9.2)'}: ${report.triangles} triangles, ${closednessText(report)}.`,
-    create: () => (lifting === 'extrude'
-      ? extrude(mesh, IMPORT_EXTRUDE_HALF_HEIGHT, name, { caps: solid })
-      : spin(mesh, IMPORT_SPIN_STEPS, name)),
+    create: () => (built ??= build()),
   };
+  // Build once now, so a model the lifting cannot handle fails here, in the
+  // import panel, rather than when the viewer first draws it; and only after
+  // that succeeds is any earlier entry removed, so a bad file never deletes
+  // a working model.
+  try {
+    built = build();
+  } catch (e) {
+    throw new Error(`'${name}' cannot be ${lifting === 'extrude' ? 'extruded' : 'spun'}: ${e instanceof Error ? e.message : String(e)}`);
+  }
+  // One model, one entry: a re-import under the same name replaces the
+  // other lifting's entry too, so no stale copy keeps the label.
+  unregisterShape(`${base}-extrude`);
+  unregisterShape(`${base}-spin`);
   registerShape(entry);
   return entry;
 }

@@ -64,7 +64,7 @@ export function setupXR(
   renderer: WebGLRenderer,
   scene: Scene,
   world: Group,
-  opts: { getRadius: () => number; onSelect?: () => void },
+  opts: { getRadius: () => number; onSelect?: () => void; onSessionStart?: () => void; onSessionEnd?: () => void },
 ): XRSetup {
   if (typeof navigator === 'undefined' || !navigator.xr) {
     return { button: null, refit: () => undefined, dispose: () => undefined };
@@ -96,6 +96,7 @@ export function setupXR(
 
   const onSessionStart = (): void => {
     if (saved) return;
+    opts.onSessionStart?.();
     saved = { position: world.position.clone(), quaternion: world.quaternion.clone(), scale: world.scale.clone() };
     world.position.set(...XR_WORLD_POSITION);
     fit();
@@ -104,6 +105,7 @@ export function setupXR(
   };
 
   const restore = (): void => {
+    opts.onSessionEnd?.();
     if (!saved) return;
     world.position.copy(saved.position);
     world.quaternion.copy(saved.quaternion);
