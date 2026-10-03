@@ -319,10 +319,7 @@ export function registerImportedShape(name: string, mesh: Mesh3, lifting: Liftin
   } catch (e) {
     throw new Error(`'${name}' cannot be ${lifting === 'extrude' ? 'extruded' : 'spun'}: ${e instanceof Error ? e.message : String(e)}`);
   }
-  // One model, one entry: a re-import under the same name replaces the
-  // other lifting's entry too, so no stale copy keeps the label.
-  unregisterShape(`${base}-extrude`);
-  unregisterShape(`${base}-spin`);
+  unregisterShape(id);
   registerShape(entry);
   return entry;
 }
@@ -385,6 +382,12 @@ export class ImportSession {
       const raw = await loadModelFile(file);
       const { mesh, report } = normaliseMesh(raw.mesh);
       if (mine !== this.ticket) return null;
+      // A new file under a name seen before replaces that model entirely:
+      // drop both liftings' entries so no stale copy keeps the label (the
+      // chosen lifting is re-registered by publish below).
+      const base = `${IMPORT_ID_PREFIX}${slugify(raw.name)}`;
+      unregisterShape(`${base}-extrude`);
+      unregisterShape(`${base}-spin`);
       this.model = { name: raw.name, mesh, report };
       let note = '';
       if (this.lifting === 'spin' && !isSolid(report)) {
