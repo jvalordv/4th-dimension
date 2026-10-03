@@ -1,8 +1,10 @@
 /**
  * Shape registrations. Importing this module registers every shape of the
  * catalogue (README table; MATH.md §8 regular polytopes, §8.5–§8.6 curved
- * solids, §9.1 lifted 3D objects) under its canonical SHAPE_IDS id, so the
- * picker, the state store and the explainer topics all agree on ids.
+ * solids, §9.1 lifted 3D objects, §9.2 spun solids, §9.3 signed distance
+ * fields) under its canonical SHAPE_IDS id, so the picker, the state store
+ * and the explainer topics all agree on ids. Models the user imports (§12)
+ * are registered at run time by src/app/import.ts, not here.
  *
  * Construction is lazy: an entry's `create` builds the shape on first use and
  * the viewer's ShapeCache keeps the instance, so registering is free and the
@@ -13,7 +15,8 @@ import type { ShapeEntry } from './registry';
 import { POLYTOPE_INFO, POLYTOPE_NAMES, polytopeShape } from '../geometry/polytopes';
 import type { PolytopeName } from '../geometry/polytopes';
 import { duocylinder, hopfShape, hypersphere } from '../geometry/curved';
-import { LIFTED_SHAPES } from '../geometry/figures';
+import { LIFTED_SHAPES, SPUN_SHAPES } from '../geometry/figures';
+import { SDF_SHAPES } from '../geometry/sdf-figures';
 
 /** Three-decimal rendering of a derived number for a description. */
 const approx = (x: number): string => x.toFixed(3);
@@ -177,10 +180,18 @@ const CURVED_ENTRIES: readonly ShapeEntry[] = [
 
 /**
  * Every entry in picker order: the six regular polytopes, the curved solids,
- * then the lifted 3D objects and figures (their entries, including groups and
- * descriptions, are defined next to the geometry in src/geometry/figures.ts).
+ * then the lifted 3D objects and figures (§9.1), the spun solids (§9.2) and
+ * the smooth SDF forms (§9.3). The entries of the last three families,
+ * including groups and descriptions, are defined next to their geometry in
+ * src/geometry/figures.ts and src/geometry/sdf-figures.ts.
  */
-export const SHAPE_ENTRIES: readonly ShapeEntry[] = [...POLYTOPE_ENTRIES, ...CURVED_ENTRIES, ...LIFTED_SHAPES];
+export const SHAPE_ENTRIES: readonly ShapeEntry[] = [
+  ...POLYTOPE_ENTRIES,
+  ...CURVED_ENTRIES,
+  ...LIFTED_SHAPES,
+  ...SPUN_SHAPES,
+  ...SDF_SHAPES,
+];
 
 /** Register every catalogue entry. Idempotent, so repeated imports are harmless. */
 export function registerAllShapes(): void {

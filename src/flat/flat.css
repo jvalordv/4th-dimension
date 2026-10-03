@@ -1,0 +1,118 @@
+/* Flatland mode (MATH.md §11). Class names mirror src/style.css where the look is shared. */
+
+.flat-root {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  background: var(--bg, #0b0e14);
+  color: var(--text, #e6e9f2);
+  font-family: var(--sans, system-ui, sans-serif);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+/* The drawing area: everything left of the explainer (above it on narrow screens). */
+.flat-stage {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: var(--explainer-width, 0px);
+  bottom: 0;
+}
+
+.flat-canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.flat-title {
+  left: 16px;
+  bottom: 16px;
+  max-width: 320px;
+  z-index: 2;
+}
+.flat-title h1 {
+  margin: 0 0 2px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted, #98a2b8);
+}
+.flat-title .shape-label {
+  font-size: 26px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+.flat-title .shape-description {
+  margin: 4px 0 0;
+  color: var(--muted, #98a2b8);
+  font-size: 13px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+
+.flat-caption {
+  top: 14px;
+  right: 16px;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  color: var(--muted, #98a2b8);
+  white-space: nowrap;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+  z-index: 2;
+}
+
+.flat-status {
+  top: 36px;
+  right: 16px;
+  font-size: 12px;
+  color: var(--muted, #98a2b8);
+  white-space: pre;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+  z-index: 2;
+}
+
+.flat-legend {
+  bottom: 16px;
+  right: 16px;
+  width: 260px;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.flat-gui {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 3;
+}
+.flat-gui .lil-gui.root {
+  --background-color: rgba(16, 20, 30, 0.88);
+  --title-background-color: rgba(28, 34, 50, 0.95);
+  --widget-color: rgba(255, 255, 255, 0.07);
+  --hover-color: rgba(255, 255, 255, 0.12);
+  --focus-color: rgba(127, 178, 255, 0.35);
+  --number-color: #7fb2ff;
+  --string-color: #ffbe6e;
+  --text-color: #e6e9f2;
+  --font-family: var(--sans, system-ui, sans-serif);
+  --font-size: 12px;
+  border: 1px solid var(--panel-border, rgba(255, 255, 255, 0.08));
+  border-radius: 8px;
+  backdrop-filter: blur(8px);
+  max-height: calc(100vh - 24px);
+  overflow-y: auto;
+}
+
+@media (max-width: 900px) {
+  .flat-stage { bottom: 38%; }
+  .flat-title { bottom: 12px; max-width: 55%; }
+  .flat-legend { bottom: 12px; width: 200px; }
+  .flat-caption { display: none; }
+  .flat-status { top: 14px; right: 12px; }
+}

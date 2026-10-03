@@ -266,11 +266,25 @@ export function triangulateLoopsConforming(
   return { positions, triangles: conformTriangulationToLoops({ positions, triangles: mapped }, clean) };
 }
 
+/** Options of extrude and ExtrudedSolid. */
+export interface ExtrudeOptions {
+  /**
+   * Whether slices include the planar sections of the two caps S × {±h}
+   * (default true). Pass false for a mesh that is not closed (MATH.md §12):
+   * the caps are sections of the solid S, which an open surface does not
+   * bound, so only the lateral part M × [−h, h] is sliced and the slices are
+   * open surfaces. The wire and the lateral tets do not depend on it.
+   */
+  caps?: boolean;
+}
+
 /** The prism S × [−h, h] over the solid S bounded by `mesh`. MATH.md §9.1 */
 export class ExtrudedSolid implements Shape4 {
   readonly kind = 'lifted' as const;
   /** Lateral boundary tets (the caps are not tetrahedralised). */
   readonly complex: TetComplex;
+  /** Whether slice() adds the cap sections (see ExtrudeOptions.caps). */
+  readonly caps: boolean;
   private readonly r: number;
   private wireCache: WireMesh4 | null = null;
 
@@ -278,10 +292,12 @@ export class ExtrudedSolid implements Shape4 {
     public readonly name: string,
     public readonly mesh: Mesh3,
     public readonly halfHeight: number,
+    opts: ExtrudeOptions = {},
   ) {
     if (!(halfHeight > 0) || !Number.isFinite(halfHeight)) {
       throw new Error(`extrude: halfHeight must be a positive number, got ${halfHeight}`);
     }
+    this.caps = opts.caps ?? true;
     this.complex = lateralComplex(mesh, halfHeight);
     // Every vertex is (v, ±h): |p|² = |v|² + h², maximised by the farthest v.
     this.r = Math.hypot(mesh3Bounds(mesh).radius, halfHeight);
@@ -313,7 +329,8 @@ export class ExtrudedSolid implements Shape4 {
 
   /**
    * Slice by h (MATH.md §9.1): marching tetrahedra over the lateral tets
-   * (§6) merged with the planar sections of the two caps. Vertices are not
+   * (§6) merged with the planar sections of the two caps (omitted when
+   * `caps` is false, for open meshes, §12). Vertices are not
    * shared between the parts; the lateral boundary and the cap loops pass
    * through the same crossing points of the mesh edges at w = ±h (the cap
    * is cut with the lateral slicer's own vertex classification, see
@@ -328,9 +345,11 @@ export class ExtrudedSolid implements Shape4 {
   slice(h: Hyperplane): TriMesh3 {
     const lateral = sliceTets(this.complex.positions, this.complex.tets, h);
     const parts: TriMesh3[] = [lateral];
-    for (const w0 of [-this.halfHeight, this.halfHeight]) {
-      const cap = this.capSlice(h, w0);
-      if (cap) parts.push(cap);
+    if (this.caps) {
+      for (const w0 of [-this.halfHeight, this.halfHeight]) {
+        const cap = this.capSlice(h, w0);
+        if (cap) parts.push(cap);
+      }
     }
     return parts.length === 1 ? lateral : mergeMeshes(parts);
   }
@@ -395,12 +414,16 @@ export class ExtrudedSolid implements Shape4 {
   wRange(): [number, number] { return [-this.halfHeight, this.halfHeight]; }
 }
 
-/** Build the prism S × [−halfHeight, halfHeight] over the solid bounded by `mesh`. MATH.md §9.1 */
-export function extrude(mesh: Mesh3, halfHeight: number, name: string): ExtrudedSolid {
-  return new ExtrudedSolid(name, mesh, halfHeight);
+/**
+ * Build the prism S × [−halfHeight, halfHeight] over the solid bounded by
+ * `mesh`. MATH.md §9.1. `opts.caps = false` is for open meshes (§12): the
+ * lateral surface is still sliced, the caps are not.
+ */
+export function extrude(mesh: Mesh3, halfHeight: number, name: string, opts?: ExtrudeOptions): ExtrudedSolid {
+  return new ExtrudedSolid(name, mesh, halfHeight, opts);
 }
 
 /** Same as extrude, typed as the generic Shape4 interface. */
-export function extrudeShape(mesh: Mesh3, halfHeight: number, name: string): Shape4 {
-  return extrude(mesh, halfHeight, name);
+export function extrudeShape(mesh: Mesh3, halfHeight: number, name: string, opts?: ExtrudeOptions): Shape4 {
+  return extrude(mesh, halfHeight, name, opts);
 }

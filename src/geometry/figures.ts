@@ -16,6 +16,8 @@ import { extrude } from './extrude';
 import type { ExtrudedSolid } from './extrude';
 import { compound } from './compound';
 import type { CompoundShape } from './compound';
+import { spin } from './spin';
+import type { SpunSolid } from './spin';
 
 // ---- Single extrusions -----------------------------------------------------
 
@@ -81,15 +83,14 @@ const place = (mesh: Mesh3, x: number, yHeads: number, z: number): Mesh3 =>
   translateMesh3(scaleMesh3(mesh, HEAD), [x * HEAD, atHeads(yHeads), z * HEAD]);
 
 /**
- * Human figure of about 7.5 heads, total height exactly 2 (crown at y = +1,
- * soles at y = −1), standing along +y and facing +z, assembled from 16
- * extruded primitives, each extruded by the same half-height h along w.
- * Dimensions below are in heads; limbs are capsules (axis rotated to y),
- * the head and hands are uvSpheres (the head's pole is its crown, so the
- * height is exact), the pelvis and feet are boxes. Parts overlap at the
- * joints and are rendered superimposed.
+ * The 16 named parts of the humanoid as 3D meshes, in display order, each in
+ * the figure's own frame (about 7.5 heads = 2 units tall between y = −1 and
+ * y = +1, standing along +y, facing +z). Dimensions below are in heads; limbs
+ * are capsules (axis rotated to y), the head and hands are uvSpheres (the
+ * head's pole is its crown, so the height is exact), the pelvis and feet are
+ * boxes. Parts overlap at the joints.
  */
-export function human(h = 0.5): CompoundShape {
+function humanPartList(): Array<[string, Mesh3]> {
   const parts: Array<[string, Mesh3]> = [];
   const add = (name: string, mesh: Mesh3): void => { parts.push([name, mesh]); };
   const mirrored = (name: string, mesh: Mesh3, x: number, y: number, z: number): void => {
@@ -118,8 +119,59 @@ export function human(h = 0.5): CompoundShape {
   mirrored('lower arm', standAlongY(capsule(0.15, 1.05, 12, 3)), 0.9, 4.3, 0);
   // Hands: spheres of radius 0.2 centred at 3.45.
   mirrored('hand', standAlongY(uvSphere(0.2, 12, 6)), 0.92, 3.45, 0);
+  return parts;
+}
 
-  return compound('Human', parts.map(([name, mesh]) => extrude(mesh, h, name)));
+/**
+ * The 3D meshes of the humanoid's 16 parts (see humanPartList), the input of
+ * both human() (extruded, MATH.md §9.1) and spunHuman() (spun, §9.2). Fresh
+ * meshes on every call.
+ */
+export function humanParts(): Mesh3[] {
+  return humanPartList().map(([, mesh]) => mesh);
+}
+
+/**
+ * Human figure of about 7.5 heads, total height exactly 2 (crown at y = +1,
+ * soles at y = −1), standing along +y and facing +z, assembled from 16
+ * extruded primitives (humanParts), each extruded by the same half-height h
+ * along w. Parts overlap at the joints and are rendered superimposed.
+ */
+export function human(h = 0.5): CompoundShape {
+  return compound('Human', humanPartList().map(([name, mesh]) => extrude(mesh, h, name)));
+}
+
+// ---- Spun figures (MATH.md §9.2) -------------------------------------------
+
+/** Ball of radius 0.4 centred at height 1.1: icosphere(0.4, 3) spun in 48 steps, a torisphere (S¹ × B³, boundary S² × S¹; MATH.md §9.3). */
+export const spunBall = (): SpunSolid =>
+  spin(translateMesh3(icosphere(0.4, 3), [0, 0, 1.1]), 48, 'Spun ball');
+
+/**
+ * Half-ball {|p| ≤ 1, z ≥ 0}: icosphere(1, 3) clipped to z ≥ 0 (§9.4) and spun
+ * in 48 steps, the polyhedral 4-ball. Its slices at w = c are balls of radius
+ * √(1 − c²) (§8.5, §9.2), the twins at c = 0 being the two halves of one ball.
+ */
+export const spunHalfBall = (): SpunSolid => spin(icosphere(1, 3), 48, 'Spun half-ball');
+
+/** Cube of side 1 centred at height 1.2 (z ∈ [0.7, 1.7]) spun in 48 steps: a ring with square cross-section. */
+export const spunCube = (): SpunSolid =>
+  spin(translateMesh3(box(1, 1, 1), [0, 0, 1.2]), 48, 'Spun cube');
+
+/**
+ * The humanoid of human() with every part spun instead of extruded: the
+ * figure is translated along +z (its facing direction, the spin's radial
+ * coordinate) until its lowest point is at z = 0.25, so that no part
+ * touches or crosses z = 0, and each of its 16 parts is spun in 36 steps.
+ * The parts overlap and are superimposed, as in human().
+ */
+export function spunHuman(): CompoundShape {
+  const parts = humanPartList();
+  let minZ = Infinity;
+  for (const [, mesh] of parts) for (const p of mesh.positions) minZ = Math.min(minZ, p[2]);
+  const lift = 0.25 - minZ;
+  return compound('Spun human', parts.map(([name, mesh]) =>
+    spin(translateMesh3(mesh, [0, 0, lift]), 36, `Spun ${name.toLowerCase()}`)));
 }
 
 // ---- Catalogue entries -----------------------------------------------------
@@ -177,5 +229,48 @@ export const LIFTED_SHAPES: readonly LiftedShapeEntry[] = [
     group: 'Figures',
     description: 'A 7.5-heads figure assembled from 16 extruded primitives standing along y: slicing along a tilted hyperplane reveals a sheared slab of the body.',
     create: () => human(),
+  },
+];
+
+/** A spun shape of the catalogue, ready for registerShape. */
+export interface SpunShapeEntry {
+  /** Stable id, equal to the matching SHAPE_IDS value. */
+  id: string;
+  label: string;
+  group: 'Spun 3D objects';
+  /** One sentence shown under the picker. */
+  description: string;
+  create: () => Shape4;
+}
+
+/** The spun 3D objects (MATH.md §9.2), in display order, ready for registerShape. */
+export const SPUN_SHAPES: readonly SpunShapeEntry[] = [
+  {
+    id: SHAPE_IDS.spunBall,
+    label: 'Spun ball',
+    group: 'Spun 3D objects',
+    description: 'A ball of radius 0.4 floating at height 1.1 above the plane z = 0, spun about that plane into a torisphere (a ball swept round a circle, boundary S² × S¹): its w = 0 slice is a pair of mirror-twin balls at z = ±1.1 that approach, merge at |w| = 0.7 and vanish beyond |w| = 1.5.',
+    create: spunBall,
+  },
+  {
+    id: SHAPE_IDS.spunHalfBall,
+    label: 'Spun half-ball',
+    group: 'Spun 3D objects',
+    description: 'A half-ball {|p| ≤ 1, z ≥ 0} spun about its flat face is exactly the 4-ball: every slice is a ball of radius √(1 − w²), and at w = 0 its mirror twins are the two halves of one whole ball.',
+    create: spunHalfBall,
+  },
+  {
+    id: SHAPE_IDS.spunCube,
+    label: 'Spun cube',
+    group: 'Spun 3D objects',
+    description: 'A unit cube centred at height 1.2 above z = 0, spun into a solid ring with square cross-section: its w = 0 slice is a pair of mirror-twin cubes at z = ±1.2 that merge at |w| = 0.7 and vanish beyond |w| = 1.7.',
+    create: spunCube,
+  },
+  {
+    id: SHAPE_IDS.spunHuman,
+    label: 'Spun human',
+    group: 'Spun 3D objects',
+    description: 'The 16-part human figure shifted to z ≥ 0.25 and spun part by part about z = 0, so that the slice at w = 0 shows the figure together with its mirror twin reflected in z, the pair drawing together and vanishing as |w| grows.',
+    create: spunHuman,
   },
 ];

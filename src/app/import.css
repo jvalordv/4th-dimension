@@ -1,0 +1,115 @@
+/*
+ * Model import panel (src/app/import.ts). Dark, using the palette variables
+ * of src/style.css (--panel, --panel-border, --text, --muted, --accent,
+ * --warm, --sans); the fallbacks are the same values.
+ */
+
+.import-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px 12px;
+  background: var(--panel, rgba(16, 20, 30, 0.86));
+  border: 1px solid var(--panel-border, rgba(255, 255, 255, 0.08));
+  border-radius: 8px;
+  color: var(--text, #e6e9f2);
+  font-family: var(--sans, system-ui, sans-serif);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.import-title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted, #98a2b8);
+}
+
+.import-drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 10px;
+  border: 1.5px dashed rgba(255, 255, 255, 0.22);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.03);
+  text-align: center;
+  transition: border-color 0.12s, background 0.12s;
+}
+
+.import-drop.is-dragover {
+  border-color: var(--accent, #7fb2ff);
+  background: rgba(127, 178, 255, 0.1);
+}
+
+.import-drop-text {
+  color: var(--muted, #98a2b8);
+}
+
+.import-browse {
+  padding: 5px 12px;
+  border: 1px solid var(--panel-border, rgba(255, 255, 255, 0.08));
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.07);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.import-browse:hover { background: rgba(255, 255, 255, 0.12); }
+
+.import-browse:focus-visible,
+.import-lifting input:focus-visible {
+  outline: 2px solid var(--accent, #7fb2ff);
+  outline-offset: 2px;
+}
+
+.import-lifting {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.import-lifting legend {
+  float: left;
+  margin-right: 14px;
+  padding: 0;
+  color: var(--muted, #98a2b8);
+}
+
+.import-lifting label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+}
+
+.import-lifting input { accent-color: var(--accent, #7fb2ff); }
+
+.import-lifting input:disabled { cursor: not-allowed; }
+.import-lifting label:has(input:disabled) { opacity: 0.45; cursor: not-allowed; }
+
+.import-note,
+.import-status,
+.import-error {
+  margin: 0;
+}
+
+.import-note {
+  font-size: 11px;
+  color: var(--muted, #98a2b8);
+}
+
+.import-status { color: var(--text, #e6e9f2); word-break: break-word; }
+.import-status:empty { display: none; }
+
+.import-error { color: var(--warm, #ff5830); word-break: break-word; }
+.import-error:empty { display: none; }
+
+.import-panel.is-busy .import-drop { opacity: 0.6; }

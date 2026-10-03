@@ -11,7 +11,16 @@
     <div id="app">
       <div id="viewport"></div>
 
+      <div id="flatland"></div>
+
+      <nav id="modebar" class="modebar" aria-label="Mode">
+        <button type="button" id="mode-4d" class="mode-button active" aria-pressed="true">4D → 3D</button>
+        <button type="button" id="mode-flat" class="mode-button" aria-pressed="false">Flatland (3D → 2D)</button>
+      </nav>
+
       <div id="gui"></div>
+
+      <div id="import" class="import-host hidden"></div>
 
       <div id="title" class="overlay"></div>
 
@@ -50,6 +59,12 @@
           <p class="help-foot">
             Rotation happens in six planes. <span class="mono">XY XZ YZ</span> are ordinary 3D rotations;
             <span class="mono">XW YW ZW</span> turn the object partly out of our space.
+          </p>
+          <p class="help-foot">
+            The top bar switches to <strong>Flatland</strong>, the same two views one dimension down (a 3D solid
+            seen by 2D creatures), with the same keys. <strong>Import model</strong> in the controls lifts your own
+            .obj or .glb into 4D by extrusion or spin. With a VR headset, <strong>Enter VR</strong> under the title
+            puts the drawing in the room; the controller trigger plays and pauses.
           </p>
         </div>
       </div>

@@ -41,10 +41,13 @@ export function sliceTets(positions: readonly Vec4[], tets: readonly Tet[], h: H
   };
 
   for (const t of tets) {
+    // Count positive corners first so the common all-in or all-out tets
+    // cost no allocation (on a 10^5-tet complex only a few percent cross).
+    const count = (s[t[0]] >= 0 ? 1 : 0) + (s[t[1]] >= 0 ? 1 : 0) + (s[t[2]] >= 0 ? 1 : 0) + (s[t[3]] >= 0 ? 1 : 0);
+    if (count === 0 || count === 4) continue;
     const pos: number[] = [];
     const neg: number[] = [];
     for (const idx of t) (s[idx] >= 0 ? pos : neg).push(idx);
-    if (pos.length === 0 || pos.length === 4) continue;
 
     // Outward normal projected into h, in chart coordinates: u_k · N (u_k ⊥ n).
     const n4 = tetNormal(positions, t);

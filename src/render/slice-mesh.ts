@@ -12,6 +12,7 @@ import {
   LineBasicMaterial,
   LineSegments,
   Mesh,
+  DoubleSide,
   MeshStandardMaterial,
 } from 'three';
 import type { TriMesh3 } from '../math/types';
@@ -87,6 +88,8 @@ export class SliceRenderable {
         polygonOffset: true,
         polygonOffsetFactor: 1,
         polygonOffsetUnits: 1,
+        // Open imported models slice to open surfaces (MATH.md §12); show their backs.
+        side: DoubleSide,
       }),
     );
     this.edges = new LineSegments(

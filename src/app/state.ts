@@ -92,6 +92,17 @@ export class ShapeCache {
   has(id: string): boolean {
     return this.instances.has(id);
   }
+
+  /**
+   * Forget the instance built for `id`, so that the next get() calls the
+   * entry's create() again. Needed when an imported model replaces an
+   * earlier entry under the same id (same name and lifting, MATH.md §12):
+   * the cached shape would otherwise be the old model. Returns whether an
+   * instance was cached.
+   */
+  evict(id: string): boolean {
+    return this.instances.delete(id);
+  }
 }
 
 export type StateChange =

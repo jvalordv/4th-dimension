@@ -1,15 +1,20 @@
 /**
  * Control panel (lil-gui), keyboard shortcuts, title overlay, colour legend,
- * status line, help overlay and the explainer tier buttons. Every user
- * interaction that changes the shape, the view mode or a rotation slider also
- * tells the explainer which topic to show.
+ * status line, help overlay, the explainer tier buttons and the model import
+ * panel (MATH.md §12). Every user interaction that changes the shape, the
+ * view mode or a rotation slider also tells the explainer which topic to
+ * show.
  */
 import GUI, { type Controller } from 'lil-gui';
 import type { ExplainerPanel, Tier } from '../explain';
 import { TIERS, TIER_LABELS } from '../explain';
+import { CompoundShape } from '../geometry/compound';
+import { SpunSolid } from '../geometry/spin';
 import { isHyperPlane, ROTATION_PLANES } from '../math/rotation';
+import type { Shape4 } from '../math/types';
 import { gradientCSS } from './colors';
-import { listShapes, type ShapeGroup } from './registry';
+import { mountImport } from './import';
+import { IMPORT_ID_PREFIX, listShapes, unregisterShape, type ShapeEntry, type ShapeGroup } from './registry';
 import {
   ANIMATION_PRESETS,
   PROJECTION_KINDS,
@@ -32,6 +37,17 @@ export interface UIElements {
   tiers: HTMLElement;
   /** Help overlay root; toggled with the `hidden` class. */
   help: HTMLElement;
+  /** Container for the model import panel (§12); toggled with the `hidden` class, mounted on first use. */
+  importPanel: HTMLElement;
+}
+
+export interface UIOptions {
+  /**
+   * Asked first for every keydown. When it returns true the key belongs to
+   * another mode of the page (Flatland, §11, has its own handler) and the 4D
+   * shortcuts are skipped for that event.
+   */
+  interceptKey?: (ev: KeyboardEvent) => boolean;
 }
 
 export interface UI {
@@ -39,10 +55,39 @@ export interface UI {
   /** Per-frame refresh of the status line (writes only when the text changed). */
   update(): void;
   toggleHelp(show?: boolean): void;
+  /** Show or hide the import panel; it is mounted the first time it is shown. */
+  toggleImport(show?: boolean): void;
+  /** Rebuild the shape picker's option list from the registry (after an import). */
+  refreshShapes(): void;
   dispose(): void;
 }
 
-const GROUP_ORDER: readonly ShapeGroup[] = ['Regular polytopes', 'Curved solids', 'Lifted 3D objects', 'Figures'];
+/** Picker order of the groups; any group missing here is appended after them. */
+const GROUP_ORDER: readonly ShapeGroup[] = [
+  'Regular polytopes',
+  'Curved solids',
+  'Lifted 3D objects',
+  'Spun 3D objects',
+  'Smooth forms (SDF)',
+  'Figures',
+  'Imported',
+];
+
+/** Explainer topic of a shape id: imported models (§12) share the 'import' topic. */
+export const shapeTopic = (id: string): string => (id.startsWith(IMPORT_ID_PREFIX) ? 'import' : id);
+
+/**
+ * The notice MATH.md §9.2 requires: a solid that crossed z = 0 was clipped to
+ * z ≥ 0 (§9.4) before being spun. Empty when nothing was clipped. A compound
+ * reports how many of its parts were.
+ */
+export function clippedNote(shape: Shape4): string {
+  const parts = shape instanceof CompoundShape ? shape.parts : [shape];
+  const clipped = parts.filter((p) => p instanceof SpunSolid && p.clipped).length;
+  if (clipped === 0) return '';
+  if (parts.length === 1) return 'The solid crossed z = 0, so it was clipped to z ≥ 0 before spinning (MATH.md §9.4).';
+  return `${clipped} of ${parts.length} parts crossed z = 0 and were clipped to z ≥ 0 before spinning (MATH.md §9.4).`;
+}
 
 const degrees = (rad: number): string => {
   const d = (rad * 180) / Math.PI;
@@ -59,22 +104,33 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, t
   return e;
 }
 
-export function mountUI(store: StateStore, panel: ExplainerPanel, els: UIElements): UI {
+/** label → id for the picker, groups in GROUP_ORDER, registry order inside a group. */
+function shapeOptions(): Record<string, string> {
+  const options: Record<string, string> = {};
+  const all = listShapes();
+  for (const group of GROUP_ORDER) {
+    for (const s of all) if (s.group === group) options[s.label] = s.id;
+  }
+  for (const s of all) if (!(s.label in options)) options[s.label] = s.id;
+  return options;
+}
+
+export function mountUI(store: StateStore, panel: ExplainerPanel, els: UIElements, opts: UIOptions = {}): UI {
   const { state } = store;
   const disposers: Array<() => void> = [];
 
   // ---- lil-gui panel -------------------------------------------------------
   const gui = new GUI({ container: els.gui, title: 'Controls', width: 300 });
 
-  const shapeOptions: Record<string, string> = {};
-  for (const group of GROUP_ORDER) {
-    for (const s of listShapes()) if (s.group === group) shapeOptions[s.label] = s.id;
-  }
-  for (const s of listShapes()) if (!(s.label in shapeOptions)) shapeOptions[s.label] = s.id;
-  gui.add(state, 'shapeId', shapeOptions).name('Shape').listen().onChange((id: string) => {
+  const shapeCtrl = gui.add(state, 'shapeId', shapeOptions()).name('Shape').listen().onChange((id: string) => {
     store.setShape(id);
-    panel.show(id);
+    panel.show(shapeTopic(id));
   });
+  // lil-gui 0.21's OptionController.options() rebuilds the <select> in place,
+  // keeping the controller's position, listen() and onChange.
+  const refreshShapes = (): void => {
+    shapeCtrl.options(shapeOptions());
+  };
 
   const view = gui.addFolder('View');
   view.add(state, 'viewMode', VIEW_MODES).name('Mode (1 2 3)').listen().onChange((mode: ViewMode) => {
@@ -85,16 +141,17 @@ export function mountUI(store: StateStore, panel: ExplainerPanel, els: UIElement
   view.add(params, 'projectionKind', PROJECTION_KINDS).name('Projection').onChange((kind: ProjectionKind) => {
     store.setProjectionKind(kind);
   });
-  const distanceCtrl = view.add(params, 'distance', 1, 10, 0.01).name('Eye distance d').onChange((d: number) => {
+  const distanceCtrl = view.add(params, 'distance', 1, 10, 0.01).name('Eye distance d').decimals(2).onChange((d: number) => {
     store.setPerspectiveDistance(d);
   });
-  const offsetCtrl = view.add(state, 'sliceOffset', -store.radius, store.radius, 0.001).name('Slice offset c')
+  const offsetCtrl = view.add(state, 'sliceOffset', -store.radius, store.radius, 0.001).name('Slice offset c').decimals(3)
     .listen().onChange(() => store.notify('sliceOffset'));
 
   const rot = gui.addFolder('Rotation (radians)');
   for (const plane of ROTATION_PLANES) {
     rot.add(state.angles, plane, -Math.PI, Math.PI, 0.001)
       .name(isHyperPlane(plane) ? `${plane}  ·  into w` : plane)
+      .decimals(3)
       .listen()
       .onChange(() => {
         store.notify('angles');
@@ -108,14 +165,18 @@ export function mountUI(store: StateStore, panel: ExplainerPanel, els: UIElement
   anim.add(state.animation, 'playing').name('Playing (space)').listen().onChange(() => store.notify('animation'));
   const actions = {
     reset: () => store.reset(),
+    importModel: () => toggleImport(),
     help: () => toggleHelp(),
   };
   anim.add(actions, 'reset').name('Reset angles and offset (R)');
 
-  const display = gui.addFolder('Display');
+  // Closed by default: it is rarely used, and the open panel would otherwise
+  // reach the title overlay at the bottom-left on an 800 px tall window.
+  const display = gui.addFolder('Display').close();
   display.add(state, 'showFaces').name('Faces').onChange(() => store.notify('display'));
   display.add(state, 'showEdges').name('Edges').onChange(() => store.notify('display'));
   display.add(state, 'showVertices').name('Vertices').onChange(() => store.notify('display'));
+  gui.add(actions, 'importModel').name('Import model');
   gui.add(actions, 'help').name('Help (?)');
 
   const syncProjectionControls = (): void => {
@@ -136,12 +197,16 @@ export function mountUI(store: StateStore, panel: ExplainerPanel, els: UIElement
   const shapeLabel = el('div', 'shape-label');
   const shapeGroup = el('div', 'shape-group');
   const shapeDesc = el('p', 'shape-description');
-  els.title.append(h1, shapeLabel, shapeGroup, shapeDesc);
+  const shapeNote = el('p', 'shape-note hidden');
+  els.title.append(h1, shapeLabel, shapeGroup, shapeDesc, shapeNote);
   const syncTitle = (): void => {
     const entry = store.entry;
     shapeLabel.textContent = entry.label;
     shapeGroup.textContent = entry.group;
     shapeDesc.textContent = entry.description;
+    const note = clippedNote(store.shape);
+    shapeNote.textContent = note;
+    shapeNote.classList.toggle('hidden', note === '');
   };
 
   // ---- legend ------------------------------------------------------------
@@ -225,8 +290,39 @@ export function mountUI(store: StateStore, panel: ExplainerPanel, els: UIElement
   els.help.addEventListener('click', onHelpClick);
   disposers.push(() => els.help.removeEventListener('click', onHelpClick));
 
+  // ---- model import (§12) --------------------------------------------------
+  let importMount: { dispose(): void } | null = null;
+  /**
+   * Called by the import panel after it registered (or re-registered) the
+   * model's entry. The cache is purged first so that a re-import under the
+   * same id is rebuilt; if the shape cannot be built (spin() refuses a solid
+   * with nothing above z = 0, §9.2) the entry is withdrawn again so that the
+   * picker never offers a shape that throws, and the error goes back to the
+   * panel, which shows the message.
+   */
+  const onImported = (entry: ShapeEntry): void => {
+    store.shapes.evict(entry.id);
+    try {
+      store.setShape(entry.id);
+    } catch (e) {
+      unregisterShape(entry.id);
+      refreshShapes();
+      throw e;
+    }
+    refreshShapes();
+    panel.show('import');
+  };
+  const toggleImport = (show?: boolean): void => {
+    const hidden = els.importPanel.classList.contains('hidden');
+    const next = show ?? hidden;
+    if (next && !importMount) importMount = mountImport(els.importPanel, onImported);
+    els.importPanel.classList.toggle('hidden', !next);
+  };
+  els.importPanel.classList.add('hidden');
+
   // ---- keyboard ----------------------------------------------------------
   const onKey = (ev: KeyboardEvent): void => {
+    if (opts.interceptKey?.(ev)) return;
     const target = ev.target as HTMLElement | null;
     if (target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) return;
     if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
@@ -292,8 +388,11 @@ export function mountUI(store: StateStore, panel: ExplainerPanel, els: UIElement
     gui,
     update,
     toggleHelp,
+    toggleImport,
+    refreshShapes,
     dispose: () => {
       for (const d of disposers) d();
+      importMount?.dispose();
       gui.destroy();
     },
   };

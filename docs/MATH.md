@@ -409,9 +409,10 @@ spin(S) = { (x, y, z cos φ, z sin φ) : (x, y, z) ∈ S, φ ∈ [0, 2π) }.
 `S` is swept about the plane `z = 0`, which becomes the `zw`-plane's origin:
 the 4D analogue of a solid of revolution. One dimension down, a half-disc
 spun about its diameter is a ball. Here a half-ball spun about its equatorial
-plane is a 4-ball, a ball lying in `z > 0` spun this way is a *spheritorus*
-(boundary `S^2 × S^1`, the 4D analogue of a solid torus), and a cube in
-`z > 0` becomes a solid ring with square cross-section.
+plane is a 4-ball, a ball lying in `z > 0` spun this way is a ball swept
+round a circle, the *torisphere* of section 9.3 (`S^1 × B^3`, boundary
+`S^2 × S^1`, the 4D analogue of a solid torus), and a cube in `z > 0` becomes
+a solid ring with square cross-section.
 
 A solid that crosses `z = 0` is first clipped to `z ≥ 0` (section 9.4), so
 that the spun solid is well defined; the viewer says so.
@@ -432,9 +433,13 @@ the split is exact. A prism with a vertex at `z = 0` collapses into a pyramid
 and yields tets with repeated vertices; those are dropped and the remaining
 tets still close up.
 
-Orientation: the outward 4D normal of a lateral tet at step `k` is the spun
-triangle normal `(n_x, n_y, n_z cos φ, n_z sin φ)` for a `φ` inside the step;
-tets are oriented against it (swap two vertices when the sign is wrong).
+Orientation: the outward 4D normal of a lateral tet at step `k` is
+positively proportional to `(n_x, n_y, (n_z / cos(π/N)) cos φ_mid,
+(n_z / cos(π/N)) sin φ_mid)` with `φ_mid` the step's middle angle; its dot
+product with the spun triangle normal `(n_x, n_y, n_z cos φ_mid, n_z sin
+φ_mid)` is `n_x^2 + n_y^2 + n_z^2 / cos(π/N) > 0`, so testing the sign of
+`cross4` of the tet's edges against the spun normal is exact. Tets are
+oriented by that test (swap two vertices when the sign is wrong).
 
 Known answers (Pappus): the 4-volume of the swept solid equals the 3-volume
 of `S` times the length of the circle traced by its centroid,
@@ -447,7 +452,8 @@ and the discrete construction gives exactly `(N/(2π)) sin(2π/N)` times that,
 because each point sweeps an `N`-gon of circumradius `z` (area
 `(N/2) z^2 sin(2π/N)`) instead of a circle. Tests assert the discrete value
 to round-off and the continuum value within the polygon factor. For a ball
-of radius `r` centred at height `z_0 > r`: `vol_4 = 2π z_0 · (4/3)π r^3`;
+of radius `r` centred at height `z_0 > r`: `vol_4 = 2π z_0 · (4/3)π r^3` (the
+torisphere volume of section 9.3);
 for the half-ball `{|p| ≤ R, z ≥ 0}`: `2π · (3R/8) · (2/3)π R^3 = π^2 R^4/2`,
 the 4-ball, whose slices and hypervolume must then match section 8.5.
 
@@ -455,8 +461,8 @@ Slices of a spun solid by `w = c`: a point `(x, y, z)` is in the slice iff
 `(x, y, √(z^2 + c^2)) ∈ S`. At `c = 0` the slice is `S` together with its
 mirror image in `z = 0`: a spun figure passes through our space as a pair of
 mirror twins that approach each other and vanish once `|c|` exceeds the
-figure's greatest height. For the spheritorus (ball of radius `r` at height
-`z_0`) the slice at `|c| < z_0 − r` is two balls of radius `r` at heights
+figure's greatest height. For the spun ball (radius `r` at height `z_0`) the
+slice at `|c| < z_0 − r` is two balls of radius `r` at heights
 `±√(z_0^2 − c^2)` up to the distortion of `√(z^2 + c^2)`, and the slice
 4-volume integral along `e_w` recovers the Pappus value.
 
@@ -473,18 +479,27 @@ unless translated (`|·|` is the Euclidean norm):
 | 4-box half-sizes `h` | `q_i = |p_i| − h_i`; `f = |max(q, 0)| + min(max_i q_i, 0)` | `16 h_1 h_2 h_3 h_4` |
 | capsule, segment `ab`, radius `r` | `|p − a − t(b − a)| − r`, `t = clamp((p−a)·(b−a)/|b−a|^2, 0, 1)` | ball + cylinder |
 | duocylinder `r_1, r_2` | `max(√(x²+y²) − r_1, √(z²+w²) − r_2)` (a bound, exact on the two tori) | `π^2 r_1^2 r_2^2` |
-| spheritorus `R, r` | `√((√(x²+y²+z²) − R)^2 + w^2) − r` | `2πR · (4/3)π r^3` |
+| spheritorus `R, r` | `√((√(x²+y²+z²) − R)^2 + w^2) − r` | `4π^2 R^2 r^2 + π^2 r^4` |
 | torisphere `R, r` | `√((√(x²+y²) − R)^2 + z^2 + w^2) − r` | `2πR · (4/3)π r^3` |
 | tiger `R_1, R_2, r` | `√((√(x²+y²) − R_1)^2 + (√(z²+w²) − R_2)^2) − r` | `4π^3 R_1 R_2 r^2` |
 | ditorus `R_1, R_2, r` | `√((√((√(x²+y²) − R_1)^2 + z^2) − R_2)^2 + w^2) − r` | `2πR_1 · 2πR_2 · π r^2` |
 
-The volumes are Pappus: the set of points within `r` of a circle of radius
-`R` is a 3-ball swept around the circle (spheritorus and torisphere are the
-same solid in different coordinates, both `S^2 × S^1`); the tiger is the
-set within `r` of the flat Clifford torus (area `4π^2 R_1 R_2`, normal disc of
-area `π r^2`, exact because the torus is flat and `r < min(R_1, R_2)`); the
-ditorus is a circle swept twice. These hold when `r` is small enough that
-the normal discs do not overlap (`r < R` for the torus-like ones).
+The volumes: the *torisphere* is the set of points within `r` of a circle
+of radius `R`, a 3-ball swept around the circle (Pappus, `S^1 × B^3`); it is
+the spun ball of section 9.2 turned by `R_YW(π/2) R_XZ(π/2)`, which swaps
+the `xy` and `zw` circles. The *spheritorus* is the set within `r` of the
+2-sphere of radius `R` in `w = 0`, a 2-disc bundle over the sphere
+(`S^2 × D^2`): its slice at `w = c` is the spherical shell `R − a ≤ |q| ≤
+R + a`, `a = √(r^2 − c^2)`, of volume `8πR^2 a + (8π/3) a^3`, and
+integrating over `c` gives `4π^2 R^2 r^2 + π^2 r^4`. The two share the
+boundary type `S^2 × S^1` but are different solids (one is simply connected,
+the other is not). The tiger is the set within `r` of the flat Clifford torus
+(area `4π^2 R_1 R_2`, normal disc of area `π r^2`, exact because the torus is
+flat and `r < min(R_1, R_2)`); at `w = 0` its slice is two coaxial solid
+tori at heights `±R_2`, which touch at `|c| = R_2 − r`, fuse, and vanish
+beyond `R_2 + r`. The ditorus is a circle swept twice. These hold when `r` is
+small enough that the normal discs do not overlap (`r < R` for the
+torus-like ones).
 
 Operations: union `min(f, g)`, intersection `max(f, g)`, difference
 `max(f, −g)`, smooth union `smin_k(f, g) = min(f, g) − h^2 / (4k)` with
@@ -531,9 +546,15 @@ extracted complex, coloured by `w` like any wire.
 the signs of `m · v − k` at their vertices (zero positive, as in section 6);
 a triangle with mixed signs is cut into the part on the positive side (one
 triangle or a quad split in two), with crossing points on edges identified by
-edge so that neighbours share them exactly. The cut is closed by the planar
+edge so that neighbours share them exactly. Vertices within `10^{-9}` of the
+mesh extent from the plane are snapped onto it (and so count as positive);
+without that, a plane within rounding of a vertex scatters crossing points
+that cannot be triangulated reliably. The cut is closed by the planar
 section of `S` by the plane (section 9.1's section machinery), oriented with
-normal `−m`. The result is a closed, consistently oriented mesh whose volume
+normal `−m`. As in section 6, the result is the limit from the removed side:
+a plane touching only a vertex or an edge removes everything, and a plane
+containing a face with the solid behind it leaves a doubled flat polygon of
+volume 0. Otherwise the result is a closed, consistently oriented mesh whose volume
 is `vol_3(S)` minus the removed part; for the ball `|p| ≤ R` clipped by
 `z ≥ 0` the volume is `(2/3)π R^3` and for the box `[−1, 1]^3` clipped by
 `z ≥ 0` it is 4.
@@ -603,5 +624,9 @@ by extrusion (9.1) or spin (9.2, after clipping). An open model can still be
 projected (the lateral structure of 9.1 needs no caps) and sliced without
 caps, and the viewer must say that its slices are then open surfaces. If the
 signed volume of a closed model is negative its triangles are reversed, so
-that outward orientation holds.
+that outward orientation holds; for an open model the same rule is applied
+as a heuristic (the flux through a nearly closed surface), since the
+viewer's slice material is lit from the front. A WebXR session adds no
+mathematics: the drawn slice or projection is placed in the room by a rigid
+motion and a uniform scale.
 

@@ -13,8 +13,14 @@
  * The slice is rebuilt only when M, c or the shape changed, and is cleared
  * the moment the shape changes; wire geometry is cached per shape; replaced
  * geometries are disposed.
+ *
+ * The slice group and the wire group live in `world`, a Group of the scene
+ * that holds everything belonging to the 4D object (grid and lights stay in
+ * the scene). Transforming `world` moves and scales the whole drawing as one
+ * body; src/render/xr.ts uses it to put the object at arm's length inside a
+ * WebXR session (MATH.md §12).
  */
-import { Clock, Color, PerspectiveCamera, Scene, WebGLRenderer, type GridHelper } from 'three';
+import { Clock, Color, Group, PerspectiveCamera, Scene, WebGLRenderer, type GridHelper } from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import type { Shape4 } from '../math/types';
 import { compositeRotation, ROTATION_PLANES } from '../math/rotation';
@@ -45,6 +51,8 @@ const SLICE_PACE_MS = 12;
 export class Viewer {
   readonly renderer: WebGLRenderer;
   readonly scene = new Scene();
+  /** Parent of the slice and wire groups; see the module comment. */
+  readonly world = new Group();
   readonly camera: PerspectiveCamera;
   readonly controls: OrbitControls;
   readonly stats: ViewerStats = {
@@ -76,7 +84,8 @@ export class Viewer {
     for (const light of createLights()) this.scene.add(light);
     this.grid = createGrid();
     this.scene.add(this.grid);
-    this.scene.add(this.slice.group);
+    this.scene.add(this.world);
+    this.world.add(this.slice.group);
 
     const { width, height } = this.size();
     this.camera = new PerspectiveCamera(42, width / Math.max(height, 1), 0.01, 1000);
@@ -133,7 +142,7 @@ export class Viewer {
   /** Select the shape to draw: fetch or build its cached wire and reframe the camera. */
   setShape(shape: Shape4, projection?: Projection): void {
     if (shape === this.currentShape) return;
-    if (this.wire) this.scene.remove(this.wire.group);
+    if (this.wire) this.world.remove(this.wire.group);
     this.currentShape = shape;
     const wireMesh = shape.wire();
     if (wireMesh) {
@@ -143,7 +152,7 @@ export class Viewer {
         this.wires.set(shape, w);
       }
       this.wire = w;
-      this.scene.add(w.group);
+      this.world.add(w.group);
       this.stats.wireVertices = w.vertexCount;
       this.stats.wireEdges = w.edgeCount;
       this.stats.wireTriangles = w.triangleCount;

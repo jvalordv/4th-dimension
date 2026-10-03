@@ -29,6 +29,11 @@ const EXPECTED_GROUPS: Readonly<Record<string, ShapeGroup>> = {
   spherinder: 'Lifted 3D objects', cubinder: 'Lifted 3D objects',
   'torus-prism': 'Lifted 3D objects', 'knot-prism': 'Lifted 3D objects',
   mug: 'Figures', human: 'Figures',
+  'spun-ball': 'Spun 3D objects', 'spun-half-ball': 'Spun 3D objects',
+  'spun-cube': 'Spun 3D objects', 'spun-human': 'Spun 3D objects',
+  'sdf-spheritorus': 'Smooth forms (SDF)', 'sdf-torisphere': 'Smooth forms (SDF)',
+  'sdf-tiger': 'Smooth forms (SDF)', 'sdf-ditorus': 'Smooth forms (SDF)',
+  'sdf-creature': 'Smooth forms (SDF)',
 };
 
 describe('shape registry wiring (src/app/shapes)', () => {
@@ -37,7 +42,15 @@ describe('shape registry wiring (src/app/shapes)', () => {
     expect(new Set(ids).size).toBe(ids.length);
     expect([...ids].sort()).toEqual(Object.values(SHAPE_IDS).sort());
     expect(ids).toEqual(SHAPE_ENTRIES.map((e) => e.id));
-    expect(ids.length).toBe(15);
+    // 6 polytopes (§8), 3 curved solids (§8.5, §8.6, §3.3), 4 lifted + 2
+    // figures (§9.1), 4 spun (§9.2), 5 SDF forms (§9.3).
+    expect(ids.length).toBe(6 + 3 + 4 + 2 + 4 + 5);
+    expect(ids.length).toBe(Object.keys(EXPECTED_GROUPS).length);
+    // Groups appear in catalogue order, each contiguous.
+    const groups = listShapes().map((e) => e.group);
+    expect(groups.filter((g, i) => i === 0 || g !== groups[i - 1])).toEqual([
+      'Regular polytopes', 'Curved solids', 'Lifted 3D objects', 'Figures', 'Spun 3D objects', 'Smooth forms (SDF)',
+    ]);
   });
 
   it('labels, groups and one-sentence descriptions', () => {
@@ -111,6 +124,9 @@ describe('shape registry wiring (src/app/shapes)', () => {
     for (const e of listShapes()) {
       if (e.group === 'Lifted 3D objects') expect(shapeOf(e.id).kind).toBe('lifted');
       if (e.group === 'Figures') expect(shapeOf(e.id).kind).toBe('compound');
+      // §9.2: one spun solid is 'lifted'; the spun human is a compound of 16 spun parts.
+      if (e.group === 'Spun 3D objects') expect(shapeOf(e.id).kind).toBe(e.id === SHAPE_IDS.spunHuman ? 'compound' : 'lifted');
+      if (e.group === 'Smooth forms (SDF)') expect(shapeOf(e.id).kind).toBe('sdf');
       if (e.group !== 'Regular polytopes' && e.id !== SHAPE_IDS.hypersphere) expect(shapeOf(e.id).wire()).not.toBeNull();
     }
   });
