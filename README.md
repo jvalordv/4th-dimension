@@ -34,12 +34,26 @@ morphing that makes 4D animations look strange.
 | Regular polytopes | 5-cell, tesseract, 16-cell, 24-cell, 120-cell, 600-cell |
 | Curved solids | 4-ball (hypersphere, 65 536 tets, within 1.4 % of the true hypervolume), duocylinder with its Clifford torus, Hopf fibration |
 | Lifted 3D objects | spherinder (ball × interval), cubinder (cylinder × interval), torus prism, torus-knot prism |
+| Spun 3D objects | a ball, a half-ball (which becomes the 4-ball), a cube and the humanoid, each swept about a plane |
+| Smooth forms (SDF) | spheritorus, torisphere, tiger, ditorus and a blended creature, defined by signed distance fields |
 | Figures | a mug and a humanoid, built from primitives and extruded along `w` |
+| Imported | any .obj or .glb you drop on the page, lifted by extrusion or spin |
 
-There is no canonical 4D version of a 3D object. The lifted shapes use
-*extrusion*, which is exactly how a square becomes a cube and a cube becomes
-a tesseract. The viewer says so, and the math document explains the
-alternatives.
+There is no canonical 4D version of a 3D object. The viewer offers two
+explicit liftings: *extrusion*, which is exactly how a square becomes a cube
+and a cube becomes a tesseract, and *spin*, the 4D solid of revolution, under
+which a figure passes through our space as a pair of mirror twins. Smooth
+forms are given as signed distance fields and sliced directly, or extracted
+to a 4D surface by marching pentatopes for the projection view.
+
+**Flatland mode** runs the whole viewer one dimension down: a 3D solid seen
+by creatures living in a plane, with the same three views and the same known
+answers (the cube's square-inside-a-square shadow, its point, triangle,
+hexagon, triangle, point slice sequence). Watching the analogy run is the
+best explainer of the 4D case.
+
+**WebXR**: on a headset browser a VR button appears and the slice or
+projection is placed in the room as a real object you can walk around.
 
 ## Try it
 
@@ -58,7 +72,7 @@ npm test           # the math checks
 npm run build      # static site in dist/
 ```
 
-Keyboard: `space` play/pause, `1` `2` `3` view modes, `R` reset, `?` help, `Esc` closes help.
+Keyboard: `space` play/pause, `1` `2` `3` view modes, `R` reset, `?` help, `Esc` closes help. The bar at the top switches between the 4D viewer and Flatland; `Import model` opens the drop zone.
 
 ## How the math is checked
 
@@ -85,7 +99,11 @@ working only from the spec, with the goal of breaking the implementation;
 the defects they found (a cap-plane perturbation in the extrusion slicer for
 nearly parallel hyperplanes, the stereographic pole landing at the origin,
 trigonometric noise breaking watertightness on axis-aligned slices) are fixed
-and their tests kept. Around 540 checks run in about 20 seconds.
+and their tests kept. The second round added spin lifting, signed distance
+fields, Flatland and import, with their own spec sections and adversarial
+suites; it also caught an error in the spec itself (a wrong volume for the
+spheritorus), which is why the spec is tested too. Around 850 checks run in
+about a minute.
 
 See [`docs/MATH.md`](docs/MATH.md) for the definitions and the catalogue of
 known answers, and `test/` for the checks.
@@ -95,8 +113,9 @@ known answers, and `test/` for the checks.
 ```
 docs/MATH.md        the specification; code follows it
 src/math/           vectors, 4×4 rotations, projections, hyperplanes
-src/geometry/       tet complexes, slicer, polytopes, curved solids, lifting
-src/render/         Three.js viewer
+src/geometry/       tet complexes, slicer, polytopes, curved solids, lifting (extrude, spin), SDFs, isosurfaces
+src/flat/           Flatland mode: the same ideas for 3D solids on a 2D canvas
+src/render/         Three.js viewer, WebXR
 src/app/            state, UI, shape registry, animation presets
 src/explain/        three-tier explainers (plain words, some background, the math)
 test/               unit tests and adversarial tests derived from the spec

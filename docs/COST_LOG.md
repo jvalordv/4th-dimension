@@ -11,6 +11,8 @@ to the assistant, a rough proxy for work volume, not a billing figure.
 | 2026-10-02 | $245.00 | $5.00 | ~38k | Concept assessment, repo scaffold (Vite/TS/Three/Vitest), docs/MATH.md spec written |
 | 2026-10-02 | (awaiting reading) | – | ~250k orchestrator + 1.44M build agents + 2.24M verify agents ≈ 3.9M | Math core and slicer; five modules built by 7 agents (polytopes, curved, lifting ×2, renderer, explainers, integration); 13-agent adversarial verification and fixes; visual check; 538 tests passing |
 
+| 2026-10-03 | (awaiting reading) | – | 1.90M build agents (5 Sonnet implementers + 1 default-model integrator) + verification in progress | Round 2: spin lifting, SDF shapes, Flatland mode, OBJ/GLB import, WebXR; 845 tests passing before verification |
+
 Notes:
 - Agent token figures are the workflow runner's totals (`subagent_tokens`) for
   the two workflows; they include cached-context reads, so they overstate
@@ -19,3 +21,6 @@ Notes:
 - Build workflow: 7 agents, 225 tool calls, 90 min wall clock, two agents at a
   time on a 4-core container. Verify workflow: 13 agents, 345 tool calls,
   108 min.
+- Round 2 build: 6 agents, 350 tool calls, 90 min. Implementers ran on
+  Sonnet at the user's request; integration and verification stay on the
+  default model because a wrong judgement there costs more than it saves.
