@@ -119,4 +119,5 @@ src/render/         Three.js viewer, WebXR
 src/app/            state, UI, shape registry, animation presets
 src/explain/        three-tier explainers (plain words, some background, the math)
 test/               unit tests and adversarial tests derived from the spec
+tools/eva-amv/      unrelated side project: shot-for-shot AMV rebuild from a Blu-ray (see its README)
 ```

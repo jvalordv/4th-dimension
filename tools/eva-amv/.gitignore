@@ -1,0 +1,3 @@
+_selftest/
+*.npz
+__pycache__/
